@@ -1,0 +1,305 @@
+
+<!-- ======================= LANDING ======================= -->
+<div id="home">
+  <header class="nav wrap">
+    <a class="mark" href="#" aria-label="Atelier ASCII home">Atelier <i>░▒▓█</i> ASCII</a>
+    <nav aria-label="Sections"><a href="#features">Features</a><a href="#exports">Exports</a><a href="#privacy">Privacy</a></nav>
+    <a class="btn repo" href="{{REPO_URL}}" target="_blank" rel="noopener" data-repo aria-label="Source code on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg><span class="hide-s">GitHub</span><span class="stars" hidden></span></a>
+    <a class="btn go" href="#studio">Open the studio</a>
+  </header>
+
+  <section class="hero wrap">
+    <div>
+      <h1>ASCII art that looks drawn by hand.</h1>
+      <p class="lede">Drop in a photo, a video or your webcam. Shape the tones like in a darkroom, choose how characters get picked, then export straight to GitHub, Discord, your terminal or a GIF.</p>
+      <div class="cta">
+        <a class="btn go lg" href="#studio">Open the studio</a>
+        <button class="btn lg" type="button" id="heroCam">
+          <svg viewBox="0 0 24 24"><path d="M15 10l5-3v10l-5-3z"/><rect x="3" y="6" width="12" height="12" rx="2"/></svg>
+          <span>Try it with your camera</span>
+        </button>
+      </div>
+      <p class="fine">Free and open source, no sign-up. Everything runs in your browser, and your images never leave your device.</p>
+    </div>
+    <div class="device">
+      <div class="dscreen" id="heroScreen"><span class="live" id="heroLive">Live demo</span><pre id="heroOut" aria-label="Live ASCII demo"></pre></div>
+      <div class="dkeys" role="radiogroup" aria-label="Demo mode" id="heroKeys">
+        <button class="key" type="button" role="radio" data-m="tone" aria-checked="true"><span class="g">░▒▓█</span><span class="n">Tones</span></button>
+        <button class="key" type="button" role="radio" data-m="shape" aria-checked="false"><span class="g">.d8b</span><span class="n">Shape</span></button>
+        <button class="key" type="button" role="radio" data-m="braille" aria-checked="false"><span class="g">⣿⣶⣤⣀</span><span class="n">Braille</span></button>
+        <button class="key" type="button" role="radio" data-m="text" aria-checked="false"><span class="g">ABC</span><span class="n">Text</span></button>
+        <button class="key" type="button" role="radio" data-m="edges" aria-checked="false"><span class="g">/|\-</span><span class="n">Edges</span></button>
+      </div>
+      <p class="dcap">Press a key to change how characters are chosen, or drop any image onto this page.</p>
+    </div>
+  </section>
+
+  <section id="features" class="wrap feats">
+    <h2 class="sec">More than a filter.</h2>
+    <p class="secp">A proper instrument for character art, with the parts other converters skip.</p>
+
+    <article class="feat">
+      <div class="ft">
+        <h3>Characters chosen by shape, not just darkness</h3>
+        <p>Most converters only ask how dark a patch is. Shape mode compares every cell with the outline of each glyph, so a diagonal becomes a slash and a lower edge becomes an underscore. The result reads like something an artist typed.</p>
+      </div>
+      <div class="ms paper"><pre data-sample="shape"></pre></div>
+    </article>
+
+    <article class="feat flip">
+      <div class="ft">
+        <h3>Portraits written in your own words</h3>
+        <p>Pick a name, a quote or a line you wrote, and the image gets drawn with it. Brightness sets how bold each letter looks. Made for gifts, posters and profile headers.</p>
+      </div>
+      <div class="ms phosphor"><pre data-sample="text"></pre></div>
+    </article>
+
+    <article class="feat">
+      <div class="ft">
+        <h3>Live video, webcam and recorded clips</h3>
+        <p>Point your camera at something and watch it turn into characters in real time. Record up to ten seconds, or loop any still image with effects like decode, rain, scan and wave. Export as a GIF, a video file or a tiny HTML player.</p>
+      </div>
+      <div class="ms cyan"><pre data-sample="video"></pre></div>
+    </article>
+
+    <article class="feat flip">
+      <div class="ft">
+        <h3>Touch it up by hand</h3>
+        <p>Paint characters, erase the background or type a signature straight onto the canvas. Your edits stay in place while you keep adjusting tone and width.</p>
+      </div>
+      <div class="ms paper"><pre data-sample="edit"></pre></div>
+    </article>
+  </section>
+
+  <section id="exports" class="wrap exps">
+    <h2 class="sec">Exports that land in the right shape.</h2>
+    <p class="secp">Every destination has its own limits. Pick where it's going and Atelier sizes, wraps and encodes it for you.</p>
+    <ul class="patch">
+      <li><i>```text</i><b>GitHub README</b><span>Code block that survives Markdown</span></li>
+      <li><i>2,000</i><b>Discord</b><span>Checked against the message limit</span></li>
+      <li><i>```</i><b>Slack</b><span>Sized so it doesn't wrap</span></li>
+      <li><i>\e[38;2</i><b>Terminal</b><span>24-bit ANSI color for banners and CLIs</span></li>
+      <li><i>style=""</i><b>Email signature</b><span>Inline-styled HTML that pastes cleanly</span></li>
+      <li><i>&lt;pre&gt;</i><b>Web embed</b><span>One self-contained tag</span></li>
+      <li><i>.png</i><b>Image</b><span>Sharp, on any of the three backgrounds</span></li>
+      <li><i>.svg</i><b>Vector</b><span>Crisp at poster size</span></li>
+      <li><i>.gif</i><b>GIF</b><span>Seamless loops from any image or clip</span></li>
+      <li><i>.mp4</i><b>Video</b><span>Ready to post on social</span></li>
+    </ul>
+  </section>
+
+  <section id="privacy" class="wrap closing">
+    <h2>Your images never leave your browser.</h2>
+    <p>No uploads, no accounts, no waiting on a server. Conversion, recording and encoding all happen on your own device. The code is open source, so you can check that for yourself.</p>
+    <div class="cta">
+      <a class="btn go lg" href="#studio">Open the studio</a>
+      <a class="btn lg repo" href="{{REPO_URL}}" target="_blank" rel="noopener" data-repo><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>Star on GitHub<span class="stars" hidden></span></a>
+    </div>
+  </section>
+
+  <footer class="wrap foot2"><span>Atelier ASCII. Made entirely of characters.</span><span>Open source under the MIT license. <a href="{{REPO_URL}}" target="_blank" rel="noopener">View the code on GitHub</a></span></footer>
+</div>
+
+<!-- ======================= STUDIO ======================= -->
+<div class="app" id="studio" hidden>
+  <header class="top">
+    <a class="mark" href="#" title="Back to the home page">Atelier <i>░▒▓█</i> ASCII</a>
+    <nav class="looks" id="looks" aria-label="Quick presets"><span>Quick presets</span></nav>
+    <label class="btn">
+      <svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+      Load<input class="fileIn" type="file" accept="image/*,video/*" hidden>
+    </label>
+    <a class="btn ib" href="{{REPO_URL}}" target="_blank" rel="noopener" title="Source code on GitHub" aria-label="Source code on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg></a>
+    <button class="btn" type="button" id="animBtn" title="Make a looping animation (A)">
+      <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>Animate
+    </button>
+    <button class="btn go" type="button" id="expBtn">
+      <svg viewBox="0 0 24 24"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>Export
+    </button>
+  </header>
+
+  <main class="screen" aria-label="Preview">
+    <div class="bar">
+      <div class="tseg" role="radiogroup" aria-label="Background">
+        <label><input type="radio" name="theme" value="paper" data-k="theme" checked><span class="dot" style="background:#F6F6F1"></span><span class="hide-s">Paper</span></label>
+        <label><input type="radio" name="theme" value="phosphor" data-k="theme"><span class="dot" style="background:#FFB547;box-shadow:0 0 0 2px #0E0F11"></span><span class="hide-s">Phosphor</span></label>
+        <label><input type="radio" name="theme" value="cyan" data-k="theme"><span class="dot" style="background:#173679"></span><span class="hide-s">Blueprint</span></label>
+      </div>
+      <div class="zoom" aria-label="Zoom">
+        <button type="button" id="zOut" aria-label="Zoom out">−</button>
+        <button type="button" id="zoomVal" title="Fit to screen (F)">Fit</button>
+        <button type="button" id="zIn" aria-label="Zoom in">+</button>
+      </div>
+      <button class="btn ib" type="button" id="cmpBtn" aria-pressed="false" title="Compare with original (C)" aria-label="Compare with original">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 2v20"/></svg>
+      </button>
+      <div class="edittools">
+        <div class="tseg icons" role="radiogroup" aria-label="Edit tool">
+          <label title="No editing"><input type="radio" name="tool" value="none" data-k="tool" checked><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-2 6z"/></svg></label>
+          <label title="Brush (B)"><input type="radio" name="tool" value="brush" data-k="tool"><svg viewBox="0 0 24 24"><path d="M18 3l3 3-9 9-3-3z"/><path d="M9 12c-3 0-5 2-5 5 0 1-1 2-2 2 2 2 6 2 8-1 1-1 1-3 0-4"/></svg></label>
+          <label title="Eraser (E)"><input type="radio" name="tool" value="erase" data-k="tool"><svg viewBox="0 0 24 24"><path d="M16 3l5 5-11 11H5l-2-2z"/><path d="M9 20h12"/></svg></label>
+          <label title="Type text (T)"><input type="radio" name="tool" value="type" data-k="tool"><svg viewBox="0 0 24 24"><path d="M5 5h14M12 5v14M9 19h6"/></svg></label>
+        </div>
+        <input id="brushChar" type="text" maxlength="2" value="#" aria-label="Brush character" title="Brush character" hidden>
+        <button class="btn" type="button" id="clearEdits" hidden>Clear edits</button>
+      </div>
+      <span class="sp"></span>
+      <button class="btn ib" type="button" id="undo" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+      <button class="btn ib" type="button" id="redo" aria-label="Redo (Ctrl+Shift+Z)" title="Redo (Ctrl+Shift+Z)"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+      <button class="btn" type="button" id="copy">Copy text</button>
+    </div>
+    <div class="vp" id="vp" data-theme="paper">
+      <div class="sheet"><div class="frame" id="frame">
+        <pre id="out" aria-label="ASCII output"></pre>
+        <canvas class="ov" id="ov" aria-hidden="true"></canvas>
+        <div class="split" id="split" role="slider" tabindex="0" aria-label="Comparison position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
+        <div class="tcur" id="tcur" hidden></div>
+      </div></div>
+    </div>
+    <div class="sfoot">
+      <span><b id="dims">0 × 0</b> characters</span>
+      <span id="modeName"></span>
+      <span class="mini" id="mini" aria-hidden="true"></span>
+      <span class="sp"></span>
+      <span class="hide-s">Drop an image or video anywhere</span>
+      <button class="linkb" type="button" id="kbBtn" aria-expanded="false">Shortcuts <kbd>?</kbd></button>
+      <div class="pop" id="kb" hidden>
+        <dl>
+          <dt><kbd>1</kbd>–<kbd>6</kbd></dt><dd>Switch mode</dd>
+          <dt><kbd>I</kbd></dt><dd>Invert tones</dd>
+          <dt><kbd>C</kbd></dt><dd>Compare with original</dd>
+          <dt><kbd>F</kbd></dt><dd>Fit to screen</dd>
+          <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Zoom</dd>
+          <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Width −10 / +10</dd>
+          <dt><kbd>B</kbd> <kbd>E</kbd> <kbd>T</kbd></dt><dd>Brush, eraser, type</dd>
+          <dt><kbd>X</kbd></dt><dd>Open export</dd>
+          <dt><kbd>A</kbd></dt><dd>Animate as a loop</dd>
+          <dt><kbd>R</kbd></dt><dd>Record a clip (video or camera)</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>Z</kbd></dt><dd>Undo (with Shift: redo)</dd>
+          <dt>Double-click</dt><dd>Resets a knob</dd>
+        </dl>
+      </div>
+    </div>
+  </main>
+
+  <aside class="rack" aria-label="Settings">
+    <section class="mod">
+      <div class="mh"><h2>Source</h2></div>
+      <div class="thumbs">
+        <figure><canvas id="thumbSrc" width="160" height="120"></canvas><figcaption>Original</figcaption></figure>
+        <figure><canvas id="thumbTone"></canvas><figcaption>What the converter sees</figcaption></figure>
+      </div>
+      <p id="srcMeta"></p>
+      <div class="srcbtns">
+        <label class="btn">Image or video<input class="fileIn" type="file" accept="image/*,video/*" hidden></label>
+        <button class="btn" type="button" id="camBtn">Camera</button>
+        <button class="btn" type="button" id="demo">Demo</button>
+      </div>
+      <div class="transport" id="transport" hidden>
+        <button class="btn ib" type="button" id="playBtn" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+        <button class="btn" type="button" id="recBtn"><span class="recdot"></span><span id="recLbl">Record clip</span></button>
+        <span id="fps"></span>
+      </div>
+    </section>
+
+    <section class="mod">
+      <div class="mh"><h2>Tone</h2><button class="linkb" type="button" id="resetTone">Reset</button></div>
+      <div class="knobs">
+        <div class="knob" data-k="bright" data-label="Brightness" data-min="-100" data-max="100" data-step="1" data-def="0" data-center="0"></div>
+        <div class="knob" data-k="contrast" data-label="Contrast" data-min="-100" data-max="100" data-step="1" data-def="0" data-center="0"></div>
+        <div class="knob" data-k="gamma" data-label="Gamma" data-min="0.3" data-max="3" data-step="0.05" data-def="1" data-center="1"></div>
+        <div class="knob" data-k="sharpen" data-label="Sharpen" data-min="0" data-max="300" data-step="5" data-def="0"></div>
+      </div>
+      <div class="sws">
+        <label class="sw">Auto levels<input type="checkbox" data-k="autoLevels" checked></label>
+        <label class="sw">Invert<input type="checkbox" data-k="invert"></label>
+      </div>
+      <canvas id="hist" aria-label="Tone histogram"></canvas>
+    </section>
+
+    <section class="mod">
+      <div class="mh"><h2>Mode</h2></div>
+      <div class="keys" role="radiogroup" aria-label="Conversion mode">
+        <label class="key"><input type="radio" name="mode" value="tone" data-k="mode" checked><span class="g">░▒▓█</span><span class="n">Tones</span></label>
+        <label class="key"><input type="radio" name="mode" value="shape" data-k="mode"><span class="g">.d8b</span><span class="n">Shape</span></label>
+        <label class="key"><input type="radio" name="mode" value="text" data-k="mode"><span class="g">ABC</span><span class="n">Text</span></label>
+        <label class="key"><input type="radio" name="mode" value="bw" data-k="mode"><span class="g">█ █ </span><span class="n">1-bit</span></label>
+        <label class="key"><input type="radio" name="mode" value="braille" data-k="mode"><span class="g">⣿⣶⣤⣀</span><span class="n">Braille</span></label>
+        <label class="key"><input type="radio" name="mode" value="edges" data-k="mode"><span class="g">/|\-</span><span class="n">Edges</span></label>
+      </div>
+      <p id="modeHint"></p>
+      <div class="mparams">
+        <div data-show="bw braille"><div class="knob" data-k="threshold" data-label="Threshold" data-min="0.05" data-max="0.95" data-step="0.01" data-def="0.5" data-center="0.5"></div></div>
+        <div data-show="edges"><div class="knob" data-k="edgeThresh" data-label="Sensitivity" data-min="0.05" data-max="1" data-step="0.01" data-def="0.3"></div></div>
+        <div data-show="text"><div class="knob" data-k="textCut" data-label="Cutoff" data-min="0" data-max="0.6" data-step="0.01" data-def="0.12"></div></div>
+        <div class="grow" data-show="tone bw braille">
+          <p class="sub">Dithering</p>
+          <div class="dith" role="radiogroup" aria-label="Dithering">
+            <label><input type="radio" name="dither" value="none" data-k="dither" checked><canvas data-m="none"></canvas>None</label>
+            <label><input type="radio" name="dither" value="fs" data-k="dither"><canvas data-m="fs"></canvas>Floyd–Steinberg</label>
+            <label><input type="radio" name="dither" value="atkinson" data-k="dither"><canvas data-m="atkinson"></canvas>Atkinson</label>
+            <label><input type="radio" name="dither" value="bayer" data-k="dither"><canvas data-m="bayer"></canvas>Bayer</label>
+          </div>
+        </div>
+        <div class="grow" data-show="edges">
+          <label class="sw">Fill with tones<input type="checkbox" data-k="edgeFill" checked></label>
+          <p class="sub" style="margin-top:6px">When off, only the lines remain, like a pen sketch.</p>
+        </div>
+        <div class="grow" data-show="text">
+          <p class="sub">Your text</p>
+          <div class="palin"><input id="textMsg" type="text" data-k="textMsg" spellcheck="false" autocomplete="off" aria-label="Text to draw with"></div>
+          <label class="sw">Shade letters by tone<input type="checkbox" data-k="textShade" checked></label>
+          <p class="sub">Cells lighter than the cutoff stay empty. Shading is kept in image, HTML and GIF exports.</p>
+        </div>
+        <div class="grow" data-show="shape">
+          <label class="sw">Full ASCII set<input type="checkbox" data-k="shapeFull" checked></label>
+          <p class="sub">Off uses only your palette. Shape mode does more work per cell, so keep the width under about 160 for smooth live video.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mod" id="charsMod">
+      <div class="mh"><h2>Characters</h2></div>
+      <div class="pals" id="pals"></div>
+      <div class="palin">
+        <input id="palette" type="text" data-k="palette" spellcheck="false" autocomplete="off" aria-label="Custom palette, light to dense">
+        <button class="btn ib" type="button" id="sortDensity" title="Sort by density" aria-label="Sort by density"><svg viewBox="0 0 24 24"><path d="M4 6h7M4 12h11M4 18h16"/></svg></button>
+        <button class="btn ib" type="button" id="reversePal" title="Reverse order" aria-label="Reverse order"><svg viewBox="0 0 24 24"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg></button>
+      </div>
+      <div class="ramp" id="ramp" aria-hidden="true"></div>
+      <div class="rampbar" aria-hidden="true"></div>
+      <p id="palHint"></p>
+    </section>
+
+    <section class="mod">
+      <div class="mh"><h2>Format</h2></div>
+      <div class="rr">
+        <div class="lab"><span>Width</span><output data-for="cols"></output></div>
+        <input class="rng" type="range" min="20" max="300" value="110" data-k="cols" aria-label="Width in characters">
+      </div>
+      <div class="rr">
+        <div class="lab"><span>Character aspect</span><output data-for="aspect"></output></div>
+        <input class="rng" type="range" min="0.35" max="0.8" step="0.01" value="0.5" data-k="aspect" aria-label="Character aspect">
+      </div>
+      <p class="note">0.50 matches most editors and terminals. If the image looks squashed where you paste it, adjust it here.</p>
+      <label class="sw">Colored characters<input type="checkbox" data-k="color"></label>
+    </section>
+  </aside>
+</div>
+
+<!-- ======================= EXPORT ======================= -->
+<div class="modal" id="exp" hidden role="dialog" aria-modal="true" aria-labelledby="expTitle">
+  <div class="mbox">
+    <nav class="mlist" id="expList" aria-label="Export destinations"></nav>
+    <div class="mmain">
+      <div class="mtop"><h3 id="expTitle"></h3><button class="btn ib" type="button" id="expClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <p id="expDesc"></p>
+      <div class="ectl" id="expCtl" hidden></div>
+      <div class="pv" id="expPv"></div>
+      <div class="stats" id="expStats"></div>
+      <div class="macts" id="expActs"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
