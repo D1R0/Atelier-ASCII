@@ -19,9 +19,28 @@ const MODE_HINTS={
   braille:"Each character holds 2×4 dots, so 8 times more detail. Looks best in modern terminals.",
   edges:"Finds edges and draws them with / \\ | - by direction. Works well on silhouettes and drawings."
 };
-const THEMES={paper:{bg:"#F6F6F1",ink:"#16181C"},phosphor:{bg:"#0E0F11",ink:"#FFB547"},cyan:{bg:"#173679",ink:"#EEF2FF"}};
+/* Screen themes. "ink" is a single color; "ramp" is a gradient (faint to strong) that colors each
+   character by its tone, or by position with by:"y" / by:"diag". "fx" lists the effects a theme
+   turns on when picked. Light or dark is worked out from the background. */
+const THEMES={
+  paper:{name:"Paper",bg:"#F6F6F1",ink:"#16181C"},
+  sepia:{name:"Sepia",bg:"#EEE2C9",ramp:["#A0703F","#3A2414"],fx:"vig grain"},
+  riso:{name:"Riso",bg:"#F4EEE2",ramp:["#FF48B0","#0078BF"],fx:"grain"},
+  lcd:{name:"Pocket LCD",bg:"#9BBC0F",ramp:["#6F9410","#306230","#0F380F"],steps:true,fx:"vig"},
+  phosphor:{name:"Phosphor",bg:"#0E0F11",ink:"#FFB547",fx:"glow scan"},
+  term:{name:"Terminal",bg:"#03110A",ramp:["#147A3D","#33FF8A","#C8FFE0"],fx:"glow scan vig"},
+  cyan:{name:"Blueprint",bg:"#173679",ink:"#EEF2FF"},
+  thermal:{name:"Thermal",bg:"#07040F",ramp:["#3B0F8C","#A3218F","#F2452A","#FFAA1F","#FFF7C9"],fx:"vig"},
+  cyber:{name:"Cyberpunk",bg:"#0B0420",ramp:["#3D2BFF","#00E5FF","#FF2BD6","#FFF04D"],fx:"glow chroma scan"},
+  synth:{name:"Synthwave",bg:"#150A33",ramp:["#36F1F2","#9D5CFF","#FF3D8B","#FFB341"],by:"y",fx:"glow vig"},
+  rainbow:{name:"Rainbow",bg:"#101114",ramp:["#FF5E5E","#FFB443","#F4F05C","#5CFF8F","#4FC3FF","#9B7BFF","#FF5EDB"],by:"diag"},
+  custom:{name:"Custom"}
+};
+const PRESET_IDS=Object.keys(THEMES).filter(k=>k!=="custom");
+const FX=[["fxGlow","glow","Glow"],["fxScan","scan","Scanlines"],["fxChroma","chroma","RGB split"],["fxVig","vig","Vignette"],["fxGrain","grain","Grain"]];
 const TONE_DEF={bright:0,contrast:0,gamma:1,sharpen:0,invert:false,autoLevels:true};
-const DEF={cols:110,aspect:.5,...TONE_DEF,mode:"tone",threshold:.5,edgeThresh:.3,edgeFill:true,dither:"none",palette:STANDARD,color:false,theme:"paper",textMsg:"ATELIER ASCII ",textCut:.12,textShade:true,shapeFull:true};
+const DEF={cols:110,aspect:.5,...TONE_DEF,mode:"tone",threshold:.5,edgeThresh:.3,edgeFill:true,dither:"none",palette:STANDARD,color:false,theme:"paper",textMsg:"ATELIER ASCII ",textCut:.12,textShade:true,shapeFull:true,
+  fxGlow:false,fxScan:false,fxChroma:false,fxVig:false,fxGrain:false,cBg:"#0f1218",cA:"#5eead4",cB:"#f472b6",cBy:"tone"};
 const LOOKS=[
   {id:"hand",name:"Hand-drawn",set:{mode:"shape",shapeFull:true,contrast:20,sharpen:60,color:false}},
   {id:"portrait",name:"Portrait",set:{mode:"tone",palette:DETAILED,contrast:25,sharpen:100,dither:"none",color:false}},
@@ -30,7 +49,9 @@ const LOOKS=[
   {id:"print",name:"Print",set:{mode:"bw",palette:" █",threshold:.5,contrast:15,sharpen:60,dither:"atkinson",color:false}},
   {id:"braille",name:"Fine Braille",set:{mode:"braille",threshold:.5,contrast:10,sharpen:40,dither:"fs",color:false}},
   {id:"sketch",name:"Sketch",set:{mode:"edges",edgeThresh:.22,edgeFill:false,sharpen:40,contrast:10,color:false}},
-  {id:"neon",name:"Color phosphor",set:{mode:"tone",palette:STANDARD,contrast:20,dither:"none",color:true,theme:"phosphor"}}
+  {id:"neon",name:"Color phosphor",set:{mode:"tone",palette:STANDARD,contrast:20,dither:"none",color:true,theme:"phosphor"}},
+  {id:"cyber",name:"Cyberpunk",set:{mode:"tone",palette:DETAILED,contrast:25,sharpen:80,dither:"none",color:false,theme:"cyber"}},
+  {id:"thermal",name:"Thermal cam",set:{mode:"tone",palette:BLOCKS,contrast:15,dither:"fs",color:false,theme:"thermal"}}
 ];
 const HKEYS=Object.keys(DEF), VIEW=new Set(["zoom","fit","compare","split","tool","brushChar"]);
 const fmt={
@@ -39,9 +60,38 @@ const fmt={
   cols:v=>`${v}<small>chars</small>`,aspect:v=>(+v).toFixed(2)
 };
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const rgbHex=c=>"#"+c.map(v=>v.toString(16).padStart(2,"0")).join("");
 const mix=(a,b,t)=>[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*t));
 const lum=c=>.2126*c[0]+.7152*c[1]+.0722*c[2];
 function esc(s){return s.replace(/[&<>]/g,m=>m==="&"?"&amp;":m==="<"?"&lt;":"&gt;");}
+
+/* ================= screen themes ================= */
+function fxDefaults(id){const f=(THEMES[id]&&THEMES[id].fx)||"",o={};FX.forEach(([k,n])=>o[k]=f.includes(n));return o;}
+const thCache=new Map();
+// Resolves the state's theme into colors, a 64-step ink lookup table and the active effects.
+// Cached, so the same settings always give the same object.
+function themeOf(S){
+  const id=THEMES[S.theme]?S.theme:"paper",T=THEMES[id],cu=id==="custom";
+  const key=id+"|"+FX.map(([k])=>S[k]?1:0).join("")+(cu?`|${S.cBg}|${S.cA}|${S.cB}|${S.cBy}`:"");
+  let R=thCache.get(key);if(R)return R;
+  let bg,stops,by,steps=false;
+  if(cu){bg=S.cBg;by=S.cBy==="solid"?null:S.cBy;stops=by?[S.cA,S.cB]:[S.cA];}
+  else{bg=T.bg;stops=T.ramp||[T.ink];by=T.ramp?(T.by||"tone"):null;steps=!!T.steps;}
+  const rgb=stops.map(hex),n=rgb.length;
+  const lut=by?Array.from({length:64},(_,i)=>{
+    if(n<2)return rgb[0];
+    let t=i/63;if(steps)t=Math.round(t*(n-1))/(n-1);
+    const x=t*(n-1),j=Math.min(n-2,Math.floor(x));return mix(rgb[j],rgb[j+1],x-j);}):null;
+  const fx={};FX.forEach(([k,nm])=>fx[nm]=!!S[k]);
+  R={id,name:T.name,bg,ink:stops[n-1],light:lum(hex(bg))>128,by,lut,stops,fx};
+  if(thCache.size>80)thCache.clear();
+  thCache.set(key,R);return R;
+}
+// Ink color for one cell: from its tone d (0 faint to 1 strong), or from its position.
+function inkAt(T,r,c,rows,cols,d){
+  const t=T.by==="y"?r/Math.max(1,rows-1):T.by==="diag"?(c/Math.max(1,cols-1)+r/Math.max(1,rows-1))/2:d;
+  return T.lut[t<=0?0:t>=1?63:Math.round(t*63)];
+}
 
 /* ================= font metrics ================= */
 let CW=.6,BW=.6,FAM='"JetBrains Mono", monospace';
@@ -168,12 +218,12 @@ function rowsFor(cols,S,src){
 }
 function convert(src,S,edits){
   const P=Array.from(S.palette),pal=P.length>=2?P:[" ","@"];
-  const TH=THEMES[S.theme],paper=S.theme==="paper",cols=S.cols,a=S.aspect,mode=S.mode,rows=rowsFor(cols,S,src);
+  const TH=themeOf(S),light=TH.light,cols=S.cols,a=S.aspect,mode=S.mode,rows=rowsFor(cols,S,src);
   const cells=[];let toneGrid,tw,th,rgb=null,colors=null;
   if(mode==="braille"){
     const pw=cols*2,ph=rows*4;const {v}=tones(src,pw,ph,S);toneGrid=v;tw=pw;th=ph;
     const b=new Float32Array(v.length);
-    for(let i=0;i<v.length;i++){const t=v[i]-S.threshold+.5;b[i]=paper?1-t:t;}
+    for(let i=0;i<v.length;i++){const t=v[i]-S.threshold+.5;b[i]=light?1-t:t;}
     const q=quantize(b,pw,ph,2,S.dither),BIT=[[1,8],[2,16],[4,32],[64,128]];
     for(let r=0;r<rows;r++){const line=[];
       for(let c=0;c<cols;c++){let code=0;
@@ -188,7 +238,7 @@ function convert(src,S,edits){
     for(let r=0;r<rows;r++){const line=[];
       for(let c=0;c<cols;c++){
         let k=0,mv=0;
-        for(let gy=0;gy<G.gh;gy++){const base=(r*G.gh+gy)*pw+c*G.gw;for(let gx=0;gx<G.gw;gx++){const t=v[base+gx],q=paper?1-t:t;vec[k++]=q;mv+=q;}}
+        for(let gy=0;gy<G.gh;gy++){const base=(r*G.gh+gy)*pw+c*G.gw;for(let gx=0;gx<G.gw;gx++){const t=v[base+gx],q=light?1-t:t;vec[k++]=q;mv+=q;}}
         mv/=len;
         let vr=0;for(let i=0;i<len;i++){const e=vec[i]-mv;vr+=e*e;}
         if(vr/len<.004){line.push(ramp[clamp(Math.round(mv*(ramp.length-1)),0,ramp.length-1)]);continue;}
@@ -201,7 +251,7 @@ function convert(src,S,edits){
     const {v,d}=tones(src,cols,rows,S);toneGrid=v;tw=cols;th=rows;rgb=d;
     const n=v.length,dens=new Float32Array(n);
     if(mode==="bw"){
-      for(let i=0;i<n;i++){const t=v[i]-S.threshold+.5;dens[i]=paper?1-t:t;}
+      for(let i=0;i<n;i++){const t=v[i]-S.threshold+.5;dens[i]=light?1-t:t;}
       const q=quantize(dens,cols,rows,2,S.dither),lo=pal[0],hi=pal[pal.length-1];
       for(let r=0;r<rows;r++){const line=[];for(let c=0;c<cols;c++)line.push(q[r*cols+c]?hi:lo);cells.push(line);}
     } else if(mode==="text"){
@@ -209,12 +259,12 @@ function convert(src,S,edits){
       const shade=S.textShade&&!S.color,bg=hex(TH.bg),ink=hex(TH.ink),cut=S.textCut;let k=0;
       if(shade)colors=[];
       for(let r=0;r<rows;r++){const line=[],crow=[];
-        for(let c=0;c<cols;c++){const t=paper?1-v[r*cols+c]:v[r*cols+c];
+        for(let c=0;c<cols;c++){const t=light?1-v[r*cols+c]:v[r*cols+c];
           if(t<cut||t<=0.02){line.push(" ");if(shade)crow.push(ink);}
-          else{line.push(msg[k%msg.length]);k++;if(shade)crow.push(mix(bg,ink,.22+.78*Math.min(1,(t-cut)/Math.max(.05,1-cut))));}}
+          else{line.push(msg[k%msg.length]);k++;if(shade)crow.push(mix(bg,TH.lut?inkAt(TH,r,c,rows,cols,t):ink,.22+.78*Math.min(1,(t-cut)/Math.max(.05,1-cut))));}}
         cells.push(line);if(shade)colors.push(crow);}
     } else {
-      for(let i=0;i<n;i++)dens[i]=paper?1-v[i]:v[i];
+      for(let i=0;i<n;i++)dens[i]=light?1-v[i]:v[i];
       const q=quantize(dens,cols,rows,pal.length,mode==="edges"?"none":S.dither);
       for(let r=0;r<rows;r++){const line=[];for(let c=0;c<cols;c++)line.push(pal[q[r*cols+c]]);cells.push(line);}
       if(mode==="edges"){
@@ -230,8 +280,21 @@ function convert(src,S,edits){
     }
   }
   if(S.color&&rgb&&!colors)colors=cells.map((line,r)=>line.map((_,c)=>{const j=(r*cols+c)*4;return [rgb[j],rgb[j+1],rgb[j+2]];}));
+  else if(!colors&&TH.lut){
+    // Gradient themes: color each cell by its average tone (or by its position).
+    const bx=tw/cols,bh=th/rows,byTone=TH.by==="tone";colors=[];
+    for(let r=0;r<rows;r++){const crow=[];
+      for(let c=0;c<cols;c++){let d=0;
+        if(byTone){
+          if(bx===1&&bh===1)d=toneGrid[r*cols+c];
+          else{const y0=Math.floor(r*bh),y1=Math.floor((r+1)*bh),x0=Math.floor(c*bx),x1=Math.floor((c+1)*bx);let s=0;
+            for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)s+=toneGrid[y*tw+x];d=s/Math.max(1,(y1-y0)*(x1-x0));}
+          if(light)d=1-d;}
+        crow.push(inkAt(TH,r,c,rows,cols,d));}
+      colors.push(crow);}
+  }
   if(edits&&edits.size)for(const [key,ch] of edits){const i=key.indexOf(","),r=+key.slice(0,i),c=+key.slice(i+1);if(r<rows&&c<cols)cells[r][c]=ch;}
-  return {cells,colors,cols,rows,mode,theme:S.theme,aspect:S.aspect,toneGrid,tw,th};
+  return {cells,colors,cols,rows,mode,theme:S.theme,screen:TH,aspect:S.aspect,toneGrid,tw,th};
 }
 function toHTML(f){
   const {cells,colors}=f;
@@ -458,8 +521,22 @@ function styleOut(){
   $("#cmpBtn").setAttribute("aria-pressed",String(state.compare));
   $("#split").setAttribute("aria-valuenow",Math.round(state.split*100));
   $("#brushChar").hidden=state.tool!=="brush";$("#clearEdits").hidden=state.tool==="none"&&!edits.size;
-  vp.dataset.theme=state.theme;
+  styleScreen(fs);
   showCursor();
+}
+// Paints the theme and the screen effects onto the viewport with CSS. The same effects are
+// drawn onto canvas by drawFrame for PNG, GIF and video, so the preview matches the export.
+let vpTh=null;
+function styleScreen(fs){
+  const T=themeOf(state);
+  if(T!==vpTh){
+    vpTh=T;vp.dataset.theme=T.id;
+    vp.style.setProperty("--th-bg",T.bg);vp.style.setProperty("--th-ink",T.ink);
+    vp.classList.toggle("light",T.light);vp.classList.toggle("dark",!T.light);
+    FX.forEach(([,n])=>vp.classList.toggle("fx-"+n,T.fx[n]));
+  }
+  vp.style.setProperty("--fs",fs+"px");
+  vp.classList.toggle("cmp",state.compare);
 }
 function drawThumbTone(v,w,h){
   const c=$("#thumbTone");if(c.width!==w||c.height!==h){c.width=w;c.height=h;}c.style.aspectRatio=`${src.w}/${src.h}`;
@@ -479,7 +556,7 @@ function drawHist(v){
   for(let i=0;i<72;i++){const hh=Math.sqrt(bins[i]/max)*(H-6);x.globalAlpha=.35+.65*(i/71);x.fillRect(i*bw+.5,H-1-hh,Math.max(1,bw-1.2),hh);}
   x.globalAlpha=1;
   if(state.mode==="bw"||state.mode==="braille"){x.fillStyle=cssv("--ink");x.fillRect(state.threshold*W-1,0,2,H);}
-  if(state.mode==="text"){x.fillStyle=cssv("--ink");const p=state.theme==="paper"?1-state.textCut:state.textCut;x.fillRect(p*W-1,0,2,H);}
+  if(state.mode==="text"){x.fillStyle=cssv("--ink");const p=themeOf(state).light?1-state.textCut:state.textCut;x.fillRect(p*W-1,0,2,H);}
 }
 function drawSwatches(){
   const m=cssv("--ink").match(/[0-9a-f]{2}/gi)||["16","18","1c"],[r,g,b]=m.map(h=>parseInt(h,16));
@@ -565,6 +642,52 @@ function syncPalette(){
   $$(".pal").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.p===state.palette)));
 }
 function syncLooks(){$$(".look").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.id===activeLook)));}
+/* ---------- screen theme picker ---------- */
+const THEME_KEYS=new Set(["theme","color","cBg","cA","cB","cBy",...FX.map(f=>f[0])]);
+let lastPreset="paper";
+// A small sample of the theme: four tone glyphs in its ink colors, on its background.
+function swatchHTML(T){
+  const glyphs=["░","▒","▓","█"],pos=T.by==="y"||T.by==="diag";
+  return glyphs.map((g,i)=>{const t=pos?i/3:.3+i*.7/3,c=T.lut?rgbHex(T.lut[Math.round(t*63)]):T.ink;return `<i style="color:${c}">${g}</i>`;}).join("");
+}
+function dotCSS(T){
+  const cs=T.lut?(T.by==="y"||T.by==="diag"?[0,.33,.66,1]:[.3,.6,1]).map(t=>rgbHex(T.lut[Math.round(t*63)])):[T.ink,T.ink];
+  return `background:linear-gradient(135deg,${cs.join(",")});box-shadow:0 0 0 2.5px ${T.bg},0 0 0 3.5px rgba(0,0,0,.18)`;
+}
+function buildThemes(){
+  $("#thGrid").innerHTML=Object.keys(THEMES).map(id=>{
+    const T=themeOf({...DEF,...state,theme:id,...(id==="custom"?{}:fxDefaults(id))});
+    return `<button type="button" class="thc" role="radio" aria-checked="false" data-th="${id}"><span class="thsw${T.fx.glow?" glow":""}" style="background:${T.bg}">${swatchHTML(T)}</span><span class="thn">${esc(T.name)}</span></button>`;
+  }).join("");
+  $$("[data-th]").forEach(b=>b.addEventListener("click",()=>setTheme(b.dataset.th)));
+}
+function syncTheme(){
+  const T=themeOf(state);
+  $$("[data-th]").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.th===T.id)));
+  const cs=$('[data-th="custom"] .thsw');
+  if(cs){const C=themeOf({...state,theme:"custom"});cs.style.background=C.bg;cs.innerHTML=swatchHTML(C);}
+  $("#thName").textContent=T.name;$("#thDot").style.cssText=dotCSS(T);
+  $("#custBox").hidden=T.id!=="custom";$("#cBwrap").hidden=state.cBy==="solid";
+  const cc=$("#custCopy");cc.hidden=T.id!=="custom";cc.textContent=`Start from ${THEMES[lastPreset].name}`;
+  $("#thNote").textContent=state.color?"Colored characters is on, so the image's own colors replace the ink. Turn it off under Format to see the theme colors.":
+    "PNG, GIF and video include the effects. Text exports keep the colors.";
+}
+function setTheme(id){
+  if(!THEMES[id])return;
+  if(id!=="custom"){lastPreset=id;Object.assign(state,fxDefaults(id));}
+  state.theme=id;syncAll();changed("theme");
+}
+function cycleTheme(dir){
+  const cur=PRESET_IDS.indexOf(state.theme==="custom"?lastPreset:state.theme);
+  const id=PRESET_IDS[(cur+dir+PRESET_IDS.length)%PRESET_IDS.length];
+  setTheme(id);toast(THEMES[id].name);
+}
+// Copies a preset's colors into the custom theme, so it can be tweaked from there.
+function customFrom(id){
+  const T=themeOf({...state,theme:id});
+  Object.assign(state,{cBg:T.bg.toLowerCase(),cA:T.stops[0].toLowerCase(),cB:T.stops[T.stops.length-1].toLowerCase(),cBy:T.by||"solid",theme:"custom"});
+  syncAll();changed("cBg");
+}
 function syncAll(){
   Object.values(KNOBS).forEach(d=>d());
   $$("[data-k]").forEach(el=>{const k=el.dataset.k;
@@ -572,7 +695,7 @@ function syncAll(){
     else if(el.type==="radio")el.checked=el.value===String(state[k]);
     else if(el.type==="range")el.value=state[k];
     else if(el!==document.activeElement)el.value=state[k];});
-  syncRanges();syncMode();syncPalette();syncLooks();
+  syncRanges();syncMode();syncPalette();syncLooks();syncTheme();
 }
 function changed(k){
   if(VIEW.has(k)){if(k==="tool"&&state.tool!=="type")cursor=null;styleOut();return;}
@@ -580,6 +703,7 @@ function changed(k){
   if(k==="mode"||k==="shapeFull")syncMode();
   if(k==="palette"||k==="textMsg"||k==="mode")syncPalette();
   if(k==="cols"||k==="aspect")syncRanges();
+  if(THEME_KEYS.has(k))syncTheme();
   schedule();commit();
 }
 function setK(k,v){state[k]=v;syncAll();changed(k);}
@@ -675,7 +799,7 @@ function recordFrame(f){
   if(rec.frames.length&&now-rec.lastT<1000/rec.fps-4)return;
   if(rec.cols===null){rec.cols=f.cols;rec.rows=f.rows;}
   if(f.cols!==rec.cols||f.rows!==rec.rows){stopRec(true);toast("Recording stopped because the size changed.");return;}
-  rec.lastT=now;rec.frames.push({cells:f.cells,colors:f.colors,cols:f.cols,rows:f.rows,mode:f.mode,theme:f.theme,aspect:f.aspect});
+  rec.lastT=now;rec.frames.push({cells:f.cells,colors:f.colors,cols:f.cols,rows:f.rows,mode:f.mode,theme:f.theme,screen:f.screen,aspect:f.aspect});
   $("#recLbl").textContent=`Stop (${(rec.frames.length/rec.fps).toFixed(1)} s)`;
   if(rec.frames.length>=rec.fps*10)stopRec(true);
 }
@@ -683,23 +807,77 @@ function stopRec(keep){
   if(!rec)return;const r=rec;rec=null;
   $("#recBtn").classList.remove("on");$("#recLbl").textContent="Record clip";
   if(keep&&r.frames.length>=2){
-    clip={frames:r.frames,fps:r.fps,cols:r.cols,rows:r.rows,theme:r.frames[0].theme,aspect:r.frames[0].aspect,mode:r.frames[0].mode};
+    clip={frames:r.frames,fps:r.fps,cols:r.cols,rows:r.rows,theme:r.frames[0].theme,screen:r.frames[0].screen,aspect:r.frames[0].aspect,mode:r.frames[0].mode};
     toast(`Clip recorded: ${r.frames.length} frames`);openExport("gif");
   } else if(keep)toast("That clip was too short.");
 }
 $("#recBtn").addEventListener("click",()=>rec?stopRec(true):startRec());
 
 /* ================= encoders ================= */
-function drawFrame(x,f,fs,pad,TH){
+function paintGlyphs(x,f,fs,pad,ink){
   const cw=CW*fs,lh=cw/f.aspect;
-  x.fillStyle=TH.bg;x.fillRect(0,0,x.canvas.width,x.canvas.height);
   x.font=`${fs}px ${FAM}`;x.textBaseline="middle";let cur="";
   for(let r=0;r<f.rows;r++)for(let c=0;c<f.cols;c++){
     const ch=f.cells[r][c];if(ch===" "||ch==="\u2800")continue;
-    const col=f.colors?`rgb(${f.colors[r][c].join(",")})`:TH.ink;
+    const col=f.colors?`rgb(${f.colors[r][c].join(",")})`:ink;
     if(col!==cur){x.fillStyle=col;cur=col;}
     x.fillText(ch,pad+c*cw,pad+r*lh+lh/2);
   }
+}
+/* Screen effects on canvas. Sizes are in units of the font size so they match the CSS preview
+   (see the .fx-* rules in globals.css): CSS blur radius R is a Gaussian of sigma R/2. */
+const scratch={};
+function scr(name,W,H){let c=scratch[name];if(!c)c=scratch[name]=document.createElement("canvas");if(c.width!==W||c.height!==H){c.width=W;c.height=H;}return c;}
+let canFilter=null;
+function blurOnto(x,src,sigma){
+  if(canFilter===null){try{const t=document.createElement("canvas").getContext("2d");t.filter="blur(2px)";canFilter=t.filter==="blur(2px)";}catch(e){canFilter=false;}}
+  x.save();
+  if(canFilter){x.filter=`blur(${sigma.toFixed(2)}px)`;x.drawImage(src,0,0);}
+  else{ // Safari without canvas filters: shrink and scale back up, which blurs about as much.
+    const k=Math.max(2,Math.round(sigma*2)),s=scr("down",Math.max(1,Math.round(src.width/k)),Math.max(1,Math.round(src.height/k))),sx=s.getContext("2d");
+    sx.clearRect(0,0,s.width,s.height);sx.imageSmoothingEnabled=true;sx.drawImage(src,0,0,s.width,s.height);
+    x.imageSmoothingEnabled=true;x.drawImage(s,0,0,src.width,src.height);
+  }
+  x.restore();
+}
+function tinted(src,color,name){
+  const c=scr(name,src.width,src.height),t=c.getContext("2d");
+  t.globalCompositeOperation="copy";t.drawImage(src,0,0);
+  t.globalCompositeOperation="source-in";t.fillStyle=color;t.fillRect(0,0,c.width,c.height);
+  t.globalCompositeOperation="source-over";return c;
+}
+let GRAIN=null;
+function grainTile(){
+  if(GRAIN)return GRAIN;
+  const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d"),im=x.createImageData(128,128),g=rng(42);
+  for(let i=0;i<im.data.length;i+=4){const v=g(),a=Math.abs(v-.5)*2;im.data[i]=im.data[i+1]=im.data[i+2]=v>.5?255:0;im.data[i+3]=Math.round(a*a*a*70);}
+  x.putImageData(im,0,0);return GRAIN=c;
+}
+function drawFrame(x,f,fs,pad,TH){
+  const W=x.canvas.width,H=x.canvas.height,fx=TH.fx||{};
+  x.fillStyle=TH.bg;x.fillRect(0,0,W,H);
+  if(fx.glow||fx.chroma){
+    const L=scr("layer",W,H),lx=L.getContext("2d");lx.clearRect(0,0,W,H);paintGlyphs(lx,f,fs,pad,TH.ink);
+    if(fx.glow){if(TH.light)blurOnto(x,L,fs*.15);else{blurOnto(x,L,fs*.4);blurOnto(x,L,fs*.1);}}
+    if(fx.chroma){const d=fs*.08;x.save();x.globalAlpha=.75;x.drawImage(tinted(L,"rgb(0,230,255)","tc"),d,0);x.drawImage(tinted(L,"rgb(255,0,80)","tr"),-d,0);x.restore();}
+    x.drawImage(L,0,0);
+  } else paintGlyphs(x,f,fs,pad,TH.ink);
+  if(fx.scan){const P=Math.max(2,fs*.42),h=P*.4;x.fillStyle=TH.light?"rgba(0,0,0,.07)":"rgba(0,0,0,.32)";for(let y=0;y<H;y+=P)x.fillRect(0,y,W,h);}
+  if(fx.vig){
+    x.save();x.translate(W/2,H/2);x.scale(W/2,H/2);
+    const g=x.createRadialGradient(0,0,0,0,0,Math.SQRT2);g.addColorStop(.5,"rgba(0,0,0,0)");g.addColorStop(1,TH.light?"rgba(60,40,20,.3)":"rgba(0,0,0,.55)");
+    x.fillStyle=g;x.fillRect(-1,-1,2,2);x.restore();
+  }
+  if(fx.grain){
+    const p=x.createPattern(grainTile(),"repeat");
+    if(p.setTransform&&window.DOMMatrix)p.setTransform(new DOMMatrix().scale(Math.max(1,fs/7)));
+    x.save();x.imageSmoothingEnabled=false;x.fillStyle=p;x.fillRect(0,0,W,H);x.restore();
+  }
+}
+// CSS text-shadow for the HTML exports, matching the preview.
+function shadowCSS(fx){
+  const s=[];if(fx.chroma)s.push("-.08em 0 rgba(255,0,80,.75)",".08em 0 rgba(0,230,255,.75)");if(fx.glow)s.push("0 0 .2em","0 0 .8em");
+  return s.length?`text-shadow:${s.join(",")};`:"";
 }
 function canvasFor(f,fs){
   const cw=CW*fs,lh=cw/f.aspect,pad=Math.round(fs*1.6),c=document.createElement("canvas");
@@ -709,11 +887,11 @@ function canvasFor(f,fs){
 async function makePNG(f){
   try{await document.fonts.load(`20px ${FAM}`);}catch(e){}
   const fs=clamp(2400/(f.cols*CW),12,28),{c,pad}=canvasFor(f,fs);
-  drawFrame(c.getContext("2d"),f,fs,pad,THEMES[f.theme]);
+  drawFrame(c.getContext("2d"),f,fs,pad,f.screen);
   return await new Promise(res=>c.toBlob(res,"image/png"));
 }
 function makeSVG(f){
-  const fs=14,cw=CW*fs,lh=cw/f.aspect,pad=24,TH=THEMES[f.theme];
+  const fs=14,cw=CW*fs,lh=cw/f.aspect,pad=24,TH=f.screen;
   const W=Math.ceil(f.cols*cw+pad*2),H=Math.ceil(f.rows*lh+pad*2);
   let body="";
   f.cells.forEach((l,r)=>{
@@ -757,25 +935,41 @@ function lzw(minSize,data,bw){
 async function makeGIF(cl,onProg){
   try{await document.fonts.load(`12px ${FAM}`);}catch(e){}
   const fs=clamp(720/(cl.cols*CW),5,14),{c,pad}=canvasFor(cl,fs),W=c.width,H=c.height,x=c.getContext("2d",{willReadFrequently:true});
-  const TH=THEMES[cl.theme],bg=hex(TH.bg),ink=hex(TH.ink),colored=cl.frames.some(f=>f.colors);
+  const TH=cl.screen,bg=hex(TH.bg),ink=hex(TH.ink),fx=TH.fx||{},colored=cl.frames.some(f=>f.colors)||FX.some(([,n])=>fx[n]);
   let bits,pal,map;
   if(!colored){
     bits=1;pal=new Uint8Array(12);pal.set(bg,0);pal.set(ink,3);
     const lb=lum(bg),li=lum(ink),dn=li-lb||1;map=(r,g,b)=>((.2126*r+.7152*g+.0722*b-lb)/dn>.5?1:0);
   } else {
-    bits=7;pal=new Uint8Array(768);
-    for(let i=0;i<256;i++){pal[i*3]=Math.round(((i>>5)&7)*255/7);pal[i*3+1]=Math.round(((i>>2)&7)*255/7);pal[i*3+2]=(i&3)*85;}
-    map=(r,g,b)=>(r&0xE0)|((g&0xE0)>>3)|(b>>6);
+    // Build a 256-color palette from what the frames actually contain, so gradients and glow
+    // keep their hues instead of snapping to a fixed palette.
+    const hist=new Uint32Array(32768),N=cl.frames.length,K=Math.min(N,8);
+    for(let s=0;s<K;s++){
+      drawFrame(x,cl.frames[Math.floor(s*N/K)],fs,pad,TH);const d=x.getImageData(0,0,W,H).data;
+      for(let j=0;j<d.length;j+=12)hist[(d[j]>>3)<<10|(d[j+1]>>3)<<5|d[j+2]>>3]++;
+      await sleep(0);
+    }
+    const P=medianCut(hist,255),lut=new Int16Array(32768).fill(-1); // index 255 is kept for "unchanged"
+    bits=7;pal=new Uint8Array(768);P.forEach((c,i)=>pal.set(c,i*3));
+    map=(r,g,b)=>{
+      const k=(r>>3)<<10|(g>>3)<<5|b>>3;let v=lut[k];if(v>=0)return v;
+      const R=(r>>3)<<3|4,G=(g>>3)<<3|4,B=(b>>3)<<3|4;let bd=Infinity;
+      for(let i=0;i<P.length;i++){const p=P[i],dr=p[0]-R,dg=p[1]-G,db=p[2]-B,dd=2*dr*dr+4*dg*dg+3*db*db;if(dd<bd){bd=dd;v=i;}}
+      return lut[k]=v;
+    };
   }
   const bw=new ByteWriter();
   bw.str("GIF89a");bw.word(W);bw.word(H);bw.byte(0x80|(bits<<4)|bits);bw.byte(0);bw.byte(0);bw.bytes(pal,pal.length);
   bw.byte(0x21);bw.byte(0xFF);bw.byte(11);bw.str("NETSCAPE2.0");bw.byte(3);bw.byte(1);bw.word(0);bw.byte(0);
-  const delay=Math.round(100/cl.fps),idx=new Uint8Array(W*H),minCode=Math.max(2,bits+1);
+  // In color GIFs, pixels that didn't change since the last frame are written as transparent, so
+  // the frame keeps what's underneath. Long transparent runs compress far better than glow and grain.
+  const delay=Math.round(100/cl.fps),idx=new Uint8Array(W*H),minCode=Math.max(2,bits+1),TR=255,shown=colored?new Uint8Array(W*H):null;
   for(let i=0;i<cl.frames.length;i++){
     drawFrame(x,cl.frames[i],fs,pad,TH);
     const d=x.getImageData(0,0,W,H).data;
     for(let p=0,j=0;p<idx.length;p++,j+=4)idx[p]=map(d[j],d[j+1],d[j+2]);
-    bw.byte(0x21);bw.byte(0xF9);bw.byte(4);bw.byte(0);bw.word(delay);bw.byte(0);bw.byte(0);
+    if(shown){if(i===0)shown.set(idx);else for(let p=0;p<idx.length;p++){if(idx[p]===shown[p])idx[p]=TR;else shown[p]=idx[p];}}
+    bw.byte(0x21);bw.byte(0xF9);bw.byte(4);bw.byte(shown?0x05:0);bw.word(delay);bw.byte(shown?TR:0);bw.byte(0);
     bw.byte(0x2C);bw.word(0);bw.word(0);bw.word(W);bw.word(H);bw.byte(0);
     lzw(minCode,idx,bw);
     onProg((i+1)/cl.frames.length);await sleep(0);
@@ -783,12 +977,36 @@ async function makeGIF(cl,onProg){
   bw.byte(0x3B);
   return new Blob([bw.result()],{type:"image/gif"});
 }
+// Median cut over a 15-bit color histogram: splits the box with the widest, busiest color range
+// until there are n boxes, then averages each box into one palette color.
+function medianCut(hist,n){
+  const ch=(b,k)=>k===0?b>>10:k===1?(b>>5)&31:b&31;
+  const box=items=>{const lo=[31,31,31],hi=[0,0,0];let cnt=0;
+    for(const b of items){cnt+=hist[b];for(let k=0;k<3;k++){const v=ch(b,k);if(v<lo[k])lo[k]=v;if(v>hi[k])hi[k]=v;}}
+    let ax=0,rg=-1;for(let k=0;k<3;k++)if(hi[k]-lo[k]>rg){rg=hi[k]-lo[k];ax=k;}
+    return {items,cnt,ax,rg};};
+  const all=[];for(let i=0;i<32768;i++)if(hist[i])all.push(i);
+  if(!all.length)return [[0,0,0]];
+  const boxes=[box(all)];
+  while(boxes.length<n){
+    let bi=-1,best=0;
+    for(let i=0;i<boxes.length;i++){const b=boxes[i];if(b.items.length<2)continue;const s=b.rg*Math.sqrt(b.cnt);if(s>best){best=s;bi=i;}}
+    if(bi<0)break;
+    const b=boxes[bi],ax=b.ax;b.items.sort((p,q)=>ch(p,ax)-ch(q,ax));
+    let acc=0,cut=b.items.length-1;
+    for(let i=0;i<b.items.length-1;i++){acc+=hist[b.items[i]];if(acc>=b.cnt/2){cut=i+1;break;}}
+    boxes.splice(bi,1,box(b.items.slice(0,cut)),box(b.items.slice(cut)));
+  }
+  return boxes.map(b=>{let r=0,g=0,bl=0;
+    for(const x of b.items){const w=hist[x];r+=((x>>10)<<3|4)*w;g+=(((x>>5)&31)<<3|4)*w;bl+=((x&31)<<3|4)*w;}
+    return [Math.round(r/b.cnt),Math.round(g/b.cnt),Math.round(bl/b.cnt)];});
+}
 async function makeVideo(cl,onProg){
   if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)throw new Error("unsupported");
   try{await document.fonts.load(`14px ${FAM}`);}catch(e){}
   const fs=clamp(1280/(cl.cols*CW),6,22),{c,pad}=canvasFor(cl,fs);
   if(c.width%2)c.width++;if(c.height%2)c.height++;
-  const x=c.getContext("2d"),TH=THEMES[cl.theme];
+  const x=c.getContext("2d"),TH=cl.screen;
   const types=["video/mp4;codecs=avc1","video/mp4","video/webm;codecs=vp9","video/webm"];
   const mime=types.find(t=>MediaRecorder.isTypeSupported(t))||"";
   drawFrame(x,cl.frames[0],fs,pad,TH);
@@ -803,8 +1021,8 @@ async function makeVideo(cl,onProg){
   return {blob:new Blob(chunks,{type}),ext:type.includes("mp4")?"mp4":"webm"};
 }
 function makePlayer(cl){
-  const TH=THEMES[cl.theme],frames=cl.frames.map(f=>toHTML(f)),lh=(.6/cl.aspect).toFixed(3),vw=(100/(cl.cols*.6)*.92).toFixed(3);
-  return `<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASCII clip</title>\n<style>html,body{margin:0;height:100%;background:${TH.bg};color:${TH.ink}}body{display:grid;place-items:center}pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:min(${vw}vw,12px);line-height:${lh};margin:0}</style></head>\n<body><pre id="p"></pre>\n<script>const F=${JSON.stringify(frames).replace(/</g,"\\u003c")};let i=0;const p=document.getElementById("p");function t(){p.innerHTML=F[i];i=(i+1)%F.length}t();setInterval(t,${Math.round(1000/cl.fps)});<\/script>\n</body></html>\n`;
+  const TH=cl.screen,frames=cl.frames.map(f=>toHTML(f)),lh=(.6/cl.aspect).toFixed(3),vw=(100/(cl.cols*.6)*.92).toFixed(3);
+  return `<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASCII clip</title>\n<style>html,body{margin:0;height:100%;background:${TH.bg};color:${TH.ink}}body{display:grid;place-items:center}pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:min(${vw}vw,12px);line-height:${lh};margin:0;${shadowCSS(TH.fx)}}</style></head>\n<body><pre id="p"></pre>\n<script>const F=${JSON.stringify(frames).replace(/</g,"\\u003c")};let i=0;const p=document.getElementById("p");function t(){p.innerHTML=F[i];i=(i+1)%F.length}t();setInterval(t,${Math.round(1000/cl.fps)});<\/script>\n</body></html>\n`;
 }
 function ansi(f){
   if(!f.colors)return plainText(f)+"\n";
@@ -812,8 +1030,8 @@ function ansi(f){
   return f.cells.map((l,r)=>{let s="",cur="";l.forEach((ch,c)=>{const k=f.colors[r][c].join(";");if(ch!==" "&&k!==cur){s+=E+"38;2;"+k+"m";cur=k;}s+=ch;});return s.replace(/\s+$/,"")+E+"0m";}).join("\n")+"\n";
 }
 function embedHTML(f,fs){
-  const TH=THEMES[f.theme],lh=(.6/f.aspect).toFixed(3);
-  return `<pre style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:${fs}px;line-height:${lh};background:${TH.bg};color:${TH.ink};padding:16px;margin:0;display:inline-block;border-radius:6px;white-space:pre">${toHTML(f)}</pre>`;
+  const TH=f.screen,lh=(.6/f.aspect).toFixed(3);
+  return `<pre style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:${fs}px;line-height:${lh};background:${TH.bg};color:${TH.ink};padding:16px;margin:0;display:inline-block;border-radius:6px;white-space:pre;${shadowCSS(TH.fx)}">${toHTML(f)}</pre>`;
 }
 
 
@@ -831,7 +1049,8 @@ async function getAnim(prog){
   const key=JSON.stringify([anim,snap(),[...edits],src&&src.name,src&&src.kind,clip?clip.frames.length:0]);
   if(animCache&&animKey===key&&!isAnim())return animCache;
   let A;
-  if(anim.useClip&&clip){let fr=clip.frames;if(anim.boomerang&&fr.length>2)fr=fr.concat(fr.slice(1,-1).reverse());A={...clip,frames:fr};}
+  // A recorded clip keeps the colors it was recorded with, but takes the effects that are on now.
+  if(anim.useClip&&clip){let fr=clip.frames;if(anim.boomerang&&fr.length>2)fr=fr.concat(fr.slice(1,-1).reverse());A={...clip,screen:{...clip.screen,fx:themeOf(state).fx},frames:fr};}
   else A=await buildEffect(anim.effect,anim.len,prog);
   animCache=A;animKey=key;return A;
 }
@@ -840,7 +1059,7 @@ async function buildEffect(eff,len,prog){
   const sw=Math.min(src.w,1600),sh=Math.round(sw*src.h/src.w),still=document.createElement("canvas");still.width=sw;still.height=sh;
   still.getContext("2d").drawImage(src.el,0,0,sw,sh);
   const S0={kind:"image",el:still,w:sw,h:sh,mirror:!!src.mirror},base=convert(S0,state,edits);
-  const {cols,rows}=base,TH=THEMES[state.theme],ink=hex(TH.ink),bg=hex(TH.bg),glow=state.theme==="paper"?[255,79,26]:[255,255,255];
+  const {cols,rows}=base,TH=base.screen,ink=hex(TH.ink),bg=hex(TH.bg),glow=TH.light?[255,79,26]:[255,255,255];
   const pal=Array.from(state.palette),pidx=new Map(pal.map((ch,j)=>[ch,j]));
   const r0=rng(7),R=new Float32Array(cols*rows).map(()=>r0()),colSp=new Float32Array(cols).map(()=>r0()<.55?1:2),colOff=new Float32Array(cols).map(()=>r0());
   const col=(r,c)=>base.colors?base.colors[r][c]:ink;
@@ -902,10 +1121,10 @@ async function buildEffect(eff,len,prog){
         }
       }
     }
-    frames.push({cells,colors:colors||null,cols,rows,mode:base.mode,theme:base.theme,aspect:base.aspect});
+    frames.push({cells,colors:colors||null,cols,rows,mode:base.mode,theme:base.theme,screen:TH,aspect:base.aspect});
     if(i%3===2){prog&&prog((i+1)/n);await sleep(0);}
   }
-  return {frames,fps,cols,rows,theme:base.theme,aspect:base.aspect,mode:base.mode};
+  return {frames,fps,cols,rows,theme:base.theme,screen:TH,aspect:base.aspect,mode:base.mode};
 }
 function buildCtl(d){
   const el=$("#expCtl");
@@ -927,13 +1146,13 @@ const DESTS=[
   {id:"github",g:"Paste into",name:"GitHub README",rec:100,desc:"Wrapped in a code block so spacing survives Markdown. Around 100 columns reads well on desktop; GitHub adds a scrollbar past that.",text:f=>"```text\n"+plainText(f)+"\n```"},
   {id:"discord",name:"Discord",rec:44,limit:2000,desc:"Messages are capped at 2,000 characters including the code fences, so keep it small. About 44 columns fits on phones without wrapping.",text:f=>"```\n"+plainText(f)+"\n```"},
   {id:"slack",name:"Slack",rec:72,desc:"Posted as a code block. Under about 80 columns it won't wrap in the normal message layout.",text:f=>"```\n"+plainText(f)+"\n```"},
-  {id:"terminal",name:"Terminal (ANSI)",rec:80,file:"ascii-ansi.txt",desc:"24-bit color escape codes for cat, login banners and CLI splash screens. Turn on colored characters for color; without it you get plain text.",text:ansi,plainPreview:true},
+  {id:"terminal",name:"Terminal (ANSI)",rec:80,file:"ascii-ansi.txt",desc:"24-bit color escape codes for cat, login banners and CLI splash screens. The color comes from the image (colored characters) or from a gradient screen theme; a single-color theme gives plain text.",text:ansi,plainPreview:true},
   {id:"email",name:"Email signature",rec:48,desc:"Inline-styled HTML. Copy it and paste into your mail app's signature editor. Keep it narrow so it doesn't dominate the email.",text:f=>embedHTML(f,6),rich:true},
   {id:"embed",name:"Web embed",file:"ascii-embed.html",desc:"A single self-contained <pre> element with inline styles. Drop it into any website or CMS that accepts HTML.",text:f=>embedHTML(f,10),rendered:true},
-  {id:"png",g:"Download",name:"PNG image",desc:"A sharp raster image on your chosen background, about 2,400 pixels wide."},
-  {id:"svg",name:"SVG vector",desc:"Scalable vector text, crisp at any size. The best choice for print and posters."},
+  {id:"png",g:"Download",name:"PNG image",desc:"A sharp raster image with your screen theme and effects, about 2,400 pixels wide."},
+  {id:"svg",name:"SVG vector",desc:"Scalable vector text in your theme colors, crisp at any size. The best choice for print and posters, so screen effects are left out."},
   {id:"txt",name:"Plain text",file:"ascii.txt",desc:"The raw characters, trailing spaces trimmed.",text:f=>plainText(f)+"\n"},
-  {id:"gif",g:"Animated",name:"GIF",anim:true,desc:"A seamless looping GIF. Pick an effect to animate your image, or use a clip recorded from video or camera. Mono loops use two colors and stay small."},
+  {id:"gif",g:"Animated",name:"GIF",anim:true,desc:"A seamless looping GIF. Pick an effect to animate your image, or use a clip recorded from video or camera. Single-color themes without effects use just two colors and stay small."},
   {id:"video",name:"Video file",anim:true,desc:"The same loop as a video file, MP4 where the browser supports it, otherwise WebM. Short loops repeat to at least three seconds so they play well on social."},
   {id:"player",name:"HTML player",anim:true,file:"ascii-player.html",desc:"A tiny web page that plays the loop as real text. Selectable, searchable and far smaller than a video, and it loops forever."}
 ];
@@ -953,7 +1172,7 @@ function buildList(){
 function pill(txt,cls){return `<span class="pill ${cls||""}">${txt}</span>`;}
 function actBtn(label,cls,fn){const b=document.createElement("button");b.type="button";b.className="btn "+(cls||"");b.textContent=label;b.addEventListener("click",()=>fn(b));$("#expActs").appendChild(b);return b;}
 function previewPre(f,txt,html){
-  const pv=$("#expPv"),TH=THEMES[f.theme];pv.innerHTML="";pv.style.background="";
+  const pv=$("#expPv"),TH=f.screen;pv.innerHTML="";pv.style.background="";
   const pre=document.createElement("pre");
   if(html!==undefined){pre.innerHTML=html;pv.style.background=TH.bg;pre.style.color=TH.ink;}else pre.textContent=txt;
   pv.appendChild(pre);
@@ -1002,7 +1221,7 @@ async function selectDest(id){
     const count=Array.from(txt).length;
     stats.push(pill(`${f.cols} × ${f.rows}`),pill(`${count.toLocaleString("en-US")} characters`));
     if(d.limit)stats.push(count<=d.limit?pill(`Fits the ${d.limit.toLocaleString("en-US")} limit`,"ok"):pill(`Over the limit by ${(count-d.limit).toLocaleString("en-US")}`,"warn"));
-    if(d.id==="terminal"&&!f.colors)stats.push(pill("No color: turn on colored characters","warn"));
+    if(d.id==="terminal"&&!f.colors)stats.push(pill("No color: turn on colored characters or pick a gradient theme","warn"));
     if(d.rich)actBtn("Copy for email","go",()=>copyRich(txt,plainText(f)));
     else actBtn("Copy","go",()=>copyText(txt));
     if(d.file)actBtn("Download","",()=>saveFile(d.file,txt,d.file.endsWith(".html")?"text/html":"text/plain"));
@@ -1021,9 +1240,18 @@ $("#animBtn").addEventListener("click",()=>openExport("gif"));
 /* ================= ui wiring ================= */
 LOOKS.forEach(l=>{
   const b=document.createElement("button");b.type="button";b.className="look";b.textContent=l.name;b.dataset.id=l.id;
-  b.addEventListener("click",()=>{Object.assign(state,TONE_DEF,l.set);activeLook=l.id;syncAll();schedule();commitNow();});
+  b.addEventListener("click",()=>{
+    Object.assign(state,TONE_DEF,l.set);
+    if(l.set.theme){lastPreset=l.set.theme;Object.assign(state,fxDefaults(l.set.theme));}
+    activeLook=l.id;syncAll();schedule();commitNow();});
   $("#looks").appendChild(b);
 });
+buildThemes();
+const thMenu=$("#thMenu");
+function toggleTh(force){const open=force!==undefined?force:thMenu.hidden;thMenu.hidden=!open;$("#thBtn").setAttribute("aria-expanded",String(open));}
+$("#thBtn").addEventListener("click",e=>{e.stopPropagation();toggleTh();});
+document.addEventListener("click",e=>{if(!thMenu.hidden&&!$("#thPick").contains(e.target))toggleTh(false);});
+$("#custCopy").addEventListener("click",()=>customFrom(lastPreset));
 PRESETS.forEach(([name,p])=>{
   const b=document.createElement("button");b.type="button";b.className="pal";b.dataset.p=p;
   b.innerHTML=`<span class="c">${esc(p.replace(/^ /,"·").slice(0,24))}</span><span class="nm">${name}, ${Array.from(p).length} characters</span>`;
@@ -1089,12 +1317,13 @@ window.addEventListener("keydown",e=>{
   else if(lk==="x")openExport();
   else if(lk==="a")openExport("gif");
   else if(lk==="r")rec?stopRec(true):startRec();
+  else if(lk==="s")cycleTheme(e.shiftKey?-1:1);
   else if(k==="+"||k==="=")zoomBy(1.18);
   else if(k==="-"||k==="_")zoomBy(1/1.18);
   else if(k==="[")setK("cols",Math.max(20,state.cols-10));
   else if(k==="]")setK("cols",Math.min(300,state.cols+10));
   else if(k==="?")toggleKb();
-  else if(k==="Escape"){toggleKb(false);if(state.tool!=="none")setK("tool","none");}
+  else if(k==="Escape"){toggleKb(false);toggleTh(false);if(state.tool!=="none")setK("tool","none");}
   else return;
   e.preventDefault();
 });
@@ -1129,6 +1358,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{drawSw
 })();
 
 /* ================= init ================= */
+document.documentElement.style.setProperty("--grain",`url(${grainTile().toDataURL()})`);
 measureFont();syncAll();drawSwatches();commitNow();
 route();
 requestAnimationFrame(loop);

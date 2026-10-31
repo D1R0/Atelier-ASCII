@@ -119,7 +119,6 @@ a{color:inherit}
 .tseg input{position:absolute;opacity:0;pointer-events:none}
 .tseg label:has(input:checked){background:var(--face-hi);box-shadow:inset 0 1px 0 var(--hl),0 1px 3px var(--shade)}
 .tseg label:has(input:focus-visible){outline:2px solid var(--accent)}
-.dot{width:11px;height:11px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
 .zoom{display:flex;align-items:center;gap:2px;padding:3px;border-radius:12px;background:var(--well);box-shadow:inset 0 1px 3px var(--shade)}
 .zoom button{border:0;background:transparent;width:28px;height:28px;border-radius:8px;font-size:17px;line-height:1}
 .zoom button:hover{background:var(--face)}
@@ -128,15 +127,66 @@ a{color:inherit}
 .edittools{display:flex;align-items:center;gap:6px}
 #brushChar{width:34px;height:34px;text-align:center;font-family:var(--mono);font-size:16px;border:0;border-radius:10px;background:var(--well);box-shadow:inset 0 1px 3px var(--shade)}
 
-.vp{position:relative;flex:1;min-height:0;overflow:auto;display:flex;margin:0 10px;padding:24px;border-radius:14px;background:var(--well);box-shadow:inset 0 2px 8px var(--shade),inset 0 0 0 1px rgba(0,0,0,.05);transition:background .25s}
-.vp[data-theme="phosphor"]{background:#0E0F11}
-.vp[data-theme="cyan"]{background:#173679}
-.sheet{margin:auto;padding:28px;border-radius:4px;transition:background .25s,box-shadow .25s}
-.vp[data-theme="paper"] .sheet{background:#F6F6F1;box-shadow:0 1px 1px rgba(0,0,0,.08),0 22px 44px -22px rgba(0,0,0,.4)}
+/* The viewport takes its colors from the screen theme (set by styleScreen in atelier.js). The
+   sheet is exactly what gets exported; effects are layers on it. Effect sizes are in units of the
+   font size (--fs) and are mirrored by drawFrame, so PNG, GIF and video match the preview. */
+.vp{--th-bg:#F6F6F1;--th-ink:#16181C;--sp:max(2px,calc(var(--fs,8px) * .42));--scan-c:rgba(0,0,0,.32);--vig-c:rgba(0,0,0,.55);
+  position:relative;flex:1;min-height:0;overflow:auto;display:flex;margin:0 10px;padding:24px;border-radius:14px;background:var(--well);box-shadow:inset 0 2px 8px var(--shade),inset 0 0 0 1px rgba(0,0,0,.05);transition:background .25s}
+.vp.dark{background:color-mix(in srgb,var(--th-bg) 45%,#000)}
+.vp.light{--scan-c:rgba(0,0,0,.07);--vig-c:rgba(60,40,20,.3)}
+.sheet{position:relative;margin:auto;padding:28px;border-radius:4px;background:var(--th-bg);box-shadow:0 1px 1px rgba(0,0,0,.08),0 22px 44px -22px rgba(0,0,0,.4);transition:background .25s,box-shadow .25s}
+.vp.dark .sheet{border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),0 30px 60px -30px rgba(0,0,0,.9)}
+.sheet::before,.sheet::after{content:"";position:absolute;inset:0;z-index:3;border-radius:inherit;pointer-events:none;transition:opacity .2s}
+.vp.fx-grain .sheet::before{background-image:var(--grain);background-size:calc(var(--fs,8px) * 128 / 7) auto;image-rendering:pixelated}
+.vp.fx-scan{--scan:repeating-linear-gradient(to bottom,var(--scan-c) 0 calc(var(--sp) * .4),transparent calc(var(--sp) * .4) var(--sp))}
+.vp.fx-vig{--vig:radial-gradient(ellipse at center,transparent 50%,var(--vig-c) 100%)}
+.sheet::after{background-image:var(--scan,none),var(--vig,none)}
+.vp.cmp .sheet::before,.vp.cmp .sheet::after{opacity:0}
 .frame{position:relative;--split:.5}
-#out{margin:0;font-family:var(--mono);white-space:pre;font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;color:#16181C}
-.vp[data-theme="phosphor"] #out{color:#FFB547;text-shadow:0 0 6px rgba(255,150,40,.45)}
-.vp[data-theme="cyan"] #out{color:#EEF2FF}
+#out{margin:0;font-family:var(--mono);white-space:pre;font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;color:var(--th-ink)}
+/* Shadows without a color take each character's own color, so gradients glow in their own hue. */
+.vp.fx-glow #out{text-shadow:0 0 .2em,0 0 .8em}
+.vp.light.fx-glow #out{text-shadow:0 0 .3em}
+.vp.fx-chroma #out{text-shadow:-.08em 0 rgba(255,0,80,.75),.08em 0 rgba(0,230,255,.75)}
+.vp.fx-chroma.fx-glow #out{text-shadow:-.08em 0 rgba(255,0,80,.75),.08em 0 rgba(0,230,255,.75),0 0 .2em,0 0 .8em}
+.vp.light.fx-chroma.fx-glow #out{text-shadow:-.08em 0 rgba(255,0,80,.75),.08em 0 rgba(0,230,255,.75),0 0 .3em}
+
+/* screen theme picker */
+.thpick{position:relative}
+.thbtn{gap:9px;padding:8px 10px 8px 12px}
+.thbtn svg{width:15px;height:15px;opacity:.6}
+.thdot{width:12px;height:12px;border-radius:50%;flex:none}
+.thpop{position:absolute;top:calc(100% + 8px);left:0;z-index:30;width:400px;max-width:calc(100vw - 40px);max-height:min(640px,calc(100dvh - 140px));overflow-y:auto;padding:14px 14px 12px;border-radius:16px;
+  background:var(--face-hi);color:var(--ink);box-shadow:inset 0 1px 0 var(--hl),0 24px 50px -14px rgba(0,0,0,.45),0 0 0 1px var(--groove)}
+.thpop .sub{margin:0 0 8px}
+.thpop kbd{font-family:var(--ui);font-size:11px;font-weight:600;padding:1px 5px;border-radius:4px;background:var(--face);box-shadow:inset 0 -1px 0 var(--groove)}
+.thhd{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.thhd .linkb{margin-top:-3px}
+.thgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 8px;margin-bottom:14px}
+.thc{display:flex;flex-direction:column;gap:5px;min-width:0;padding:0;border:0;background:transparent;text-align:left;font-size:12px}
+.thsw{display:flex;align-items:center;justify-content:center;height:42px;border-radius:9px;font-family:var(--mono);font-size:15px;line-height:1;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);transition:transform .12s,box-shadow .12s}
+.thsw i{font-style:normal}
+.thsw.glow i{text-shadow:0 0 6px}
+.thc:hover .thsw{transform:translateY(-1px)}
+.thc[aria-checked="true"] .thsw{box-shadow:0 0 0 2px var(--face-hi),0 0 0 3.5px var(--accent)}
+.thn{padding-left:2px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thc[aria-checked="true"] .thn{color:var(--ink);font-weight:600}
+.fxs{display:flex;flex-wrap:wrap;gap:6px}
+.fxc{position:relative;padding:6px 12px;border-radius:99px;font-size:13px;cursor:pointer;user-select:none;box-shadow:inset 0 0 0 1px var(--groove);transition:background .15s}
+.fxc:hover{background:var(--face)}
+.fxc input{position:absolute;opacity:0;pointer-events:none}
+.fxc:has(input:checked){background:var(--ink);color:var(--body);box-shadow:none}
+.fxc:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.cust{margin:0 0 14px;padding:12px 12px 10px;border-radius:12px;background:var(--well);box-shadow:inset 0 1px 3px var(--shade)}
+.cpicks{display:flex;gap:10px;margin-bottom:10px}
+.cpick{display:flex;align-items:center;gap:7px;min-width:0;font-size:12.5px;cursor:pointer}
+.cpick input{-webkit-appearance:none;appearance:none;flex:none;width:28px;height:28px;padding:0;border:0;border-radius:8px;background:none;cursor:pointer}
+.cpick input::-webkit-color-swatch-wrapper{padding:0}
+.cpick input::-webkit-color-swatch{border:0;border-radius:8px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
+.cpick input::-moz-color-swatch{border:0;border-radius:8px}
+.cust .tseg{background:var(--face)}
+.cust .tseg label{padding:5px 9px;font-size:12.5px}
+.thnote{font-size:12px;color:var(--muted);margin:12px 0 0;line-height:1.45}
 .ov{position:absolute;inset:0;width:100%;height:100%;display:none;clip-path:inset(0 calc((1 - var(--split)) * 100%) 0 0)}
 .split{display:none;position:absolute;top:-14px;bottom:-14px;left:calc(var(--split) * 100%);width:2px;margin-left:-1px;background:var(--accent);cursor:ew-resize;touch-action:none}
 .split::after{content:"";position:absolute;top:50%;left:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:var(--accent);box-shadow:0 2px 8px rgba(0,0,0,.35),inset 0 0 0 7px var(--accent),inset 0 0 0 9px #fff}

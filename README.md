@@ -25,8 +25,13 @@ Everything runs in your browser, and your images never leave your device.
   dithering.
 - **Edit by hand.** Paint characters, erase the background or type a signature onto the canvas.
   Edits stay in place while you keep adjusting tone and width.
-- **Three themes:** Paper, Phosphor and Blueprint.
-- **Keyboard driven.** Press `?` in the studio for the full list of shortcuts.
+- **Twelve screen themes,** from Paper, Sepia and Riso to Phosphor, Terminal, Thermal, Cyberpunk,
+  Synthwave and Rainbow, plus a custom theme with your own background and ink gradient. Gradients
+  can follow the tone of the image or run vertically or diagonally.
+- **Screen effects:** glow, scanlines, RGB split, vignette and grain. They show in the preview and
+  are baked into PNG, GIF and video exports.
+- **Keyboard driven.** Press `S` to flip through screen themes, or `?` in the studio for the full list
+  of shortcuts.
 
 ### Exports
 

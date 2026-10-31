@@ -81,7 +81,7 @@
       <li><i>\e[38;2</i><b>Terminal</b><span>24-bit ANSI color for banners and CLIs</span></li>
       <li><i>style=""</i><b>Email signature</b><span>Inline-styled HTML that pastes cleanly</span></li>
       <li><i>&lt;pre&gt;</i><b>Web embed</b><span>One self-contained tag</span></li>
-      <li><i>.png</i><b>Image</b><span>Sharp, on any of the three backgrounds</span></li>
+      <li><i>.png</i><b>Image</b><span>Sharp, with your screen theme and effects</span></li>
       <li><i>.svg</i><b>Vector</b><span>Crisp at poster size</span></li>
       <li><i>.gif</i><b>GIF</b><span>Seamless loops from any image or clip</span></li>
       <li><i>.mp4</i><b>Video</b><span>Ready to post on social</span></li>
@@ -120,10 +120,38 @@
 
   <main class="screen" aria-label="Preview">
     <div class="bar">
-      <div class="tseg" role="radiogroup" aria-label="Background">
-        <label><input type="radio" name="theme" value="paper" data-k="theme" checked><span class="dot" style="background:#F6F6F1"></span><span class="hide-s">Paper</span></label>
-        <label><input type="radio" name="theme" value="phosphor" data-k="theme"><span class="dot" style="background:#FFB547;box-shadow:0 0 0 2px #0E0F11"></span><span class="hide-s">Phosphor</span></label>
-        <label><input type="radio" name="theme" value="cyan" data-k="theme"><span class="dot" style="background:#173679"></span><span class="hide-s">Blueprint</span></label>
+      <div class="thpick" id="thPick">
+        <button class="btn thbtn" type="button" id="thBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="thMenu" title="Screen theme and effects (S)">
+          <span class="thdot" id="thDot" aria-hidden="true"></span><span class="hide-s" id="thName">Paper</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+        </button>
+        <div class="thpop" id="thMenu" role="dialog" aria-label="Screen theme and effects" hidden>
+          <div class="thhd"><p class="sub">Screen</p><span class="sub"><kbd>S</kbd> next theme</span></div>
+          <div class="thgrid" id="thGrid" role="radiogroup" aria-label="Screen theme"></div>
+          <div class="cust" id="custBox" hidden>
+            <div class="thhd"><p class="sub">Custom colors</p><button class="linkb" type="button" id="custCopy"></button></div>
+            <div class="cpicks">
+              <label class="cpick"><input type="color" data-k="cBg" value="#0f1218"><span>Background</span></label>
+              <label class="cpick"><input type="color" data-k="cA" value="#5eead4"><span>Ink</span></label>
+              <label class="cpick" id="cBwrap"><input type="color" data-k="cB" value="#f472b6"><span>Ink 2</span></label>
+            </div>
+            <div class="tseg" role="radiogroup" aria-label="Ink gradient">
+              <label><input type="radio" name="cBy" value="solid" data-k="cBy">Solid</label>
+              <label><input type="radio" name="cBy" value="tone" data-k="cBy" checked>By tone</label>
+              <label><input type="radio" name="cBy" value="y" data-k="cBy">Vertical</label>
+              <label><input type="radio" name="cBy" value="diag" data-k="cBy">Diagonal</label>
+            </div>
+          </div>
+          <p class="sub">Effects</p>
+          <div class="fxs">
+            <label class="fxc"><input type="checkbox" data-k="fxGlow">Glow</label>
+            <label class="fxc"><input type="checkbox" data-k="fxScan">Scanlines</label>
+            <label class="fxc"><input type="checkbox" data-k="fxChroma">RGB split</label>
+            <label class="fxc"><input type="checkbox" data-k="fxVig">Vignette</label>
+            <label class="fxc"><input type="checkbox" data-k="fxGrain">Grain</label>
+          </div>
+          <p class="thnote" id="thNote"></p>
+        </div>
       </div>
       <div class="zoom" aria-label="Zoom">
         <button type="button" id="zOut" aria-label="Zoom out">−</button>
@@ -167,6 +195,7 @@
         <dl>
           <dt><kbd>1</kbd>–<kbd>6</kbd></dt><dd>Switch mode</dd>
           <dt><kbd>I</kbd></dt><dd>Invert tones</dd>
+          <dt><kbd>S</kbd></dt><dd>Next screen theme (with Shift: previous)</dd>
           <dt><kbd>C</kbd></dt><dd>Compare with original</dd>
           <dt><kbd>F</kbd></dt><dd>Fit to screen</dd>
           <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Zoom</dd>
