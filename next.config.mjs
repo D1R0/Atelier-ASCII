@@ -3,6 +3,8 @@ const nextConfig = {
   // Uncomment to build a fully static site (folder "out/") you can upload to any
   // hosting, including classic cPanel/PHP hosting. API routes won't work in that mode.
   // output: "export",
+
+  output: "standalone",
   poweredByHeader: false,
   async headers() {
     return [
