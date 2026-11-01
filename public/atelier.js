@@ -335,9 +335,18 @@ async function saveFile(name,data,mime){
       else toast("The save didn't go through.");}
     return;
   }
+  if(data==null){toast("The file couldn't be created on this device. Try a smaller width.");return;}
   const blob=data instanceof Blob?data:new Blob([data],{type:mime||"application/octet-stream"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast(`Downloaded ${name}`);
+  // iPhones ask "Download?" first and only read the file after the answer, so the link has to outlive that.
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);toast(`Downloaded ${name}`);
+}
+// Phones can hand a file to the share sheet, which is where iPhones offer "Save Image" to Photos
+// (a download lands in the Files app instead). Only allowed while the tap is fresh, so call it
+// straight from a click handler with the file already made.
+const canShareFiles=()=>{try{return matchMedia("(pointer: coarse)").matches&&!!navigator.canShare&&navigator.canShare({files:[new File([""],"a.png",{type:"image/png"})]});}catch(e){return false;}};
+function shareFile(file){
+  navigator.share({files:[file]}).catch(e=>{if(e&&e.name!=="AbortError")toast("Sharing didn't work here. Use Download instead.");});
 }
 async function copyText(txt,msg){
   try{await navigator.clipboard.writeText(txt);toast(msg||"Copied to clipboard");return;}catch(e){}
@@ -884,11 +893,23 @@ function canvasFor(f,fs){
   c.width=Math.ceil(f.cols*cw+pad*2);c.height=Math.ceil(f.rows*lh+pad*2);
   return {c,pad};
 }
+// iOS keeps a canvas's memory until it is resized to zero, and caps the total for the whole page.
+function freeCanvases(...cs){cs.concat(Object.values(scratch)).forEach(c=>{c.width=c.height=0;});}
+// Phones limit canvas size (iOS: about 16.7 million pixels) and total canvas memory. Past that
+// there's no error: drawing fails or toBlob returns null. So cap the size up front, and step it
+// down if the device still refuses. Resolves to null if even the smallest size fails.
+const PNG_MAX_PX=16e6;
 async function makePNG(f){
   try{await document.fonts.load(`20px ${FAM}`);}catch(e){}
-  const fs=clamp(2400/(f.cols*CW),12,28),{c,pad}=canvasFor(f,fs);
-  drawFrame(c.getContext("2d"),f,fs,pad,f.screen);
-  return await new Promise(res=>c.toBlob(res,"image/png"));
+  const perFs2=(f.cols*CW+3.2)*(f.rows*CW/f.aspect+3.2); // canvas pixels per font size squared, padding included
+  let fs=Math.min(clamp(2400/(f.cols*CW),12,28),Math.sqrt(PNG_MAX_PX/perFs2));
+  for(let i=0;i<4;i++,fs*=.7){
+    const {c,pad}=canvasFor(f,fs);let blob=null;
+    try{drawFrame(c.getContext("2d"),f,fs,pad,f.screen);blob=await new Promise(res=>c.toBlob(res,"image/png"));}catch(e){}
+    freeCanvases(c);
+    if(blob)return blob;
+  }
+  return null;
 }
 function makeSVG(f){
   const fs=14,cw=CW*fs,lh=cw/f.aspect,pad=24,TH=f.screen;
@@ -1204,11 +1225,20 @@ async function selectDest(id){
     $("#expStats").innerHTML=stats.join("");
     return;
   } else if(d.id==="png"){
-    $("#expPv").innerHTML="";$("#expPv").style.background="";
-    makePNG(f).then(blob=>{if(expId!=="png")return;pvUrl=URL.createObjectURL(blob);const img=new Image();img.src=pvUrl;img.alt="PNG preview";$("#expPv").innerHTML="";$("#expPv").appendChild(img);
+    // Rendered once: the preview and both buttons use the same file, so a tap saves it right away
+    // instead of re-rendering first (by then phones no longer count the tap and block the save).
+    const tok=++animTok,pv=$("#expPv");pv.innerHTML='<p class="sub">Rendering the image…</p>';pv.style.background="";
+    let png;const ready=makePNG(f);
+    ready.then(blob=>{png=blob;if(tok!==animTok||expId!=="png")return;
+      if(!blob){pv.innerHTML='<p class="sub">This image is too large for this device. Lower the width and try again.</p>';return;}
+      pvUrl=URL.createObjectURL(blob);const img=new Image();img.src=pvUrl;img.alt="PNG preview";pv.innerHTML="";pv.appendChild(img);
       $("#expStats").insertAdjacentHTML("beforeend",pill(`${Math.round(blob.size/1024)} KB`));});
     stats.push(pill(`${f.cols} × ${f.rows}`));
-    actBtn("Download PNG","go",async()=>saveFile("ascii.png",await makePNG(f),"image/png"));
+    actBtn("Download PNG","go",async()=>saveFile("ascii.png",png||await ready,"image/png"));
+    if(canShareFiles())actBtn("Save or share","",()=>{
+      if(png===undefined){toast("Still rendering the image. Try again in a moment.");return;}
+      if(!png){toast("This image is too large for this device. Lower the width and try again.");return;}
+      shareFile(new File([png],"ascii.png",{type:"image/png"}));});
   } else if(d.id==="svg"){
     const svg=makeSVG(f);pvUrl=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"}));
     const img=new Image();img.src=pvUrl;img.alt="SVG preview";$("#expPv").innerHTML="";$("#expPv").style.background="";$("#expPv").appendChild(img);
