@@ -52,9 +52,9 @@ There are no uploads, accounts or servers doing the work. Conversion, recording 
 happen on your device. The only network requests the page makes are for web fonts and for the
 GitHub star count shown next to the GitHub buttons.
 
-## Getting startedConfiguration
+## Getting started
 
-You need [Node.js](https://nodejs.org) 20.9 or newer.
+Use [Node.js](https://nodejs.org) 24 or newer.
 
 ```bash
 git clone https://github.com/D1R0/Atelier-ASCII.git
@@ -98,8 +98,8 @@ The camera only works over HTTPS, so make sure your deployment uses it.
 ### Your own server (Ubuntu VPS)
 
 ```bash
-# Install Node.js 20, Nginx and PM2
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+# Install Node.js 24, Nginx and PM2
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs nginx
 sudo npm install -g pm2
 
