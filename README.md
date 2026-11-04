@@ -19,8 +19,9 @@ Everything runs in your browser, and your images never leave your device.
 - **Six modes:** Tones `░▒▓█`, Shape `.d8b`, Text `ABC`, 1-bit, Braille `⣿⣶⣤⣀` and Edges `/|\-`.
 - **Portraits written in your own words.** Draw an image with a name, a quote or any line of
   text, with brightness setting how bold each letter looks.
-- **Live video and webcam.** Convert in real time, record clips of up to ten seconds, or loop a
-  still image with effects like decode, rain, scan and wave.
+- **Live video and webcam.** Convert in real time, export a whole video with its sound, record
+  clips of up to ten seconds, or loop a still image with effects like decode, rain, scan and wave.
+- **Full screen.** Press `Shift+F` to fill the screen with the art, handy for projecting or recording.
 - **Darkroom-style tone controls:** auto levels, invert, and Floyd–Steinberg, Atkinson or Bayer
   dithering.
 - **Edit by hand.** Paint characters, erase the background or type a signature onto the canvas.
@@ -45,6 +46,7 @@ Everything runs in your browser, and your images never leave your device.
 | Web embed       | One self-contained `<pre>` tag                   |
 | PNG / SVG       | Sharp raster images or vectors for poster sizes  |
 | GIF / MP4       | Seamless loops and videos ready for social media |
+| Full video      | Your whole video converted, with its sound       |
 | Frames (JSON)   | Every frame as text rows, for your own player    |
 
 ## Privacy

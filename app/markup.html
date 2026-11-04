@@ -57,7 +57,7 @@
     <article class="feat">
       <div class="ft">
         <h3>Live video, webcam and recorded clips</h3>
-        <p>Point your camera at something and watch it turn into characters in real time. Record up to ten seconds, or loop any still image with effects like decode, rain, scan and wave. Export as a GIF, a video file, a tiny HTML player or the raw frames as text.</p>
+        <p>Point your camera at something and watch it turn into characters in real time. Convert a whole video with its sound, record up to ten seconds, or loop any still image with effects like decode, rain, scan and wave. Export as a GIF, a video file, a tiny HTML player or the raw frames as text.</p>
       </div>
       <div class="ms cyan"><pre data-sample="video"></pre></div>
     </article>
@@ -161,6 +161,9 @@
       <button class="btn ib" type="button" id="cmpBtn" aria-pressed="false" title="Compare with original (C)" aria-label="Compare with original">
         <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 2v20"/></svg>
       </button>
+      <button class="btn ib" type="button" id="fsBtn" aria-pressed="false" title="Full screen (Shift+F)" aria-label="Full screen">
+        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
       <div class="edittools">
         <div class="tseg icons" role="radiogroup" aria-label="Edit tool">
           <label title="No editing"><input type="radio" name="tool" value="none" data-k="tool" checked><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-2 6z"/></svg></label>
@@ -183,6 +186,9 @@
         <div class="split" id="split" role="slider" tabindex="0" aria-label="Comparison position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
         <div class="tcur" id="tcur" hidden></div>
       </div></div>
+      <button class="btn ib fsx" type="button" id="fsExit" title="Exit full screen (Esc)" aria-label="Exit full screen">
+        <svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+      </button>
     </div>
     <div class="sfoot">
       <span><b id="dims">0 × 0</b> characters</span>
@@ -198,6 +204,7 @@
           <dt><kbd>S</kbd></dt><dd>Next screen theme (with Shift: previous)</dd>
           <dt><kbd>C</kbd></dt><dd>Compare with original</dd>
           <dt><kbd>F</kbd></dt><dd>Fit to screen</dd>
+          <dt><kbd>Shift</kbd> <kbd>F</kbd></dt><dd>Full screen</dd>
           <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Zoom</dd>
           <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Width −10 / +10</dd>
           <dt><kbd>B</kbd> <kbd>E</kbd> <kbd>T</kbd></dt><dd>Brush, eraser, type</dd>

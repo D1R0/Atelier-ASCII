@@ -390,7 +390,7 @@ function route(){
     requestAnimationFrame(()=>{measureFont();drawSwatches();styleOut();schedule();});
     window.scrollTo(0,0);
   } else {
-    closeExport();stopRec(false);
+    closeExport();stopRec(false);if(vp.classList.contains("fs"))setFs(false);
     requestAnimationFrame(renderSamples);
   }
 }
@@ -449,8 +449,10 @@ let edits=new Map(),editStack=[],lastAction="state",cursor=null;
 let clip=null,rec=null,paused=false,fpsCount=0,fpsT=0,liveFps=0;
 const vp=$("#vp"),frame=$("#frame"),out=$("#out");
 const isAnim=()=>src&&(src.kind==="video"||src.kind==="camera");
+const isVideo=()=>!!(src&&src.kind==="video"&&src.url);
 
 function setSource(s){
+  if(fullJob)fullJob.cancel();
   if(src&&src!==s)stopSource(src);
   src=s;pendingReveal=true;edits=new Map();editStack=[];cursor=null;clip=null;stopRec(false);paused=false;
   drawThumbSrc();drawOverlay();
@@ -1054,6 +1056,62 @@ async function makeVideo(cl,onProg){
   const type=(mr.mimeType||mime||"video/webm").split(";")[0];
   return {blob:new Blob(chunks,{type}),ext:type.includes("mp4")?"mp4":"webm"};
 }
+// The whole loaded video, converted with the current settings, at its own length and with its sound.
+// MediaRecorder only records in real time, so a second copy of the video plays through once, its
+// sound routed into the recording instead of the speakers. Call it straight from a click: browsers
+// only let a video play with sound right after a tap.
+let fullJob=null;
+const clock=s=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
+async function makeFullVideo(onProg,onFrame){
+  if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)throw new Error("unsupported");
+  const S0=src,v=document.createElement("video");v.playsInline=true;v.preload="auto";v.src=S0.url;
+  const AC=window.AudioContext||window.webkitAudioContext;let ac=null,aud=[];
+  try{ac=new AC();const dst=ac.createMediaStreamDestination();ac.createMediaElementSource(v).connect(dst);aud=dst.stream.getAudioTracks();ac.resume().catch(()=>{});}
+  catch(e){v.muted=true;}
+  const started=v.play();
+  let stop=false,wake=()=>{};fullJob={cancel(){stop=true;wake();}};
+  // Pause the studio's own copy so the two don't compete for the CPU.
+  const resume=S0.kind==="video"&&!paused;if(resume){paused=true;S0.el.pause();syncPlay();}
+  let mr=null,c=null,onVis=null;
+  try{
+    try{await started;}catch(e){v.muted=true;await v.play();}
+    v.pause();if(v.currentTime>0){v.currentTime=0;await new Promise(r=>v.addEventListener("seeked",r,{once:true}));}
+    if(stop)return null;
+    try{await document.fonts.load(`14px ${FAM}`);}catch(e){}
+    const S={...S0,el:v};let f=convert(S,state,edits);
+    const fs=clamp(1280/(f.cols*CW),6,22),cf=canvasFor(f,fs),pad=cf.pad;c=cf.c;
+    if(c.width%2)c.width++;if(c.height%2)c.height++;
+    const x=c.getContext("2d");drawFrame(x,f,fs,pad,f.screen);
+    const types=aud.length?["video/mp4;codecs=avc1,mp4a.40.2","video/mp4","video/webm;codecs=vp9,opus","video/webm"]:["video/mp4;codecs=avc1","video/mp4","video/webm;codecs=vp9","video/webm"];
+    const mime=types.find(t=>MediaRecorder.isTypeSupported(t))||"";
+    const stream=new MediaStream([...c.captureStream(30).getVideoTracks(),...aud]),chunks=[];
+    mr=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:5e6}:{});
+    mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    const stopped=new Promise(r=>mr.onstop=r),ended=new Promise(r=>{v.onended=r;wake=r;});
+    if(stop)wake();
+    // Hidden tabs stop drawing, so pause both instead of recording a frozen frame.
+    onVis=()=>{if(stop)return;if(document.hidden){v.pause();if(mr.state==="recording")mr.pause();}else{if(mr.state==="paused")mr.resume();v.play().catch(()=>{});}};
+    document.addEventListener("visibilitychange",onVis);
+    mr.start(1000);if(!stop)await v.play();
+    let lastT=-1,lastPv=0;
+    (function step(){
+      if(stop||v.ended)return;requestAnimationFrame(step);
+      if(v.currentTime===lastT||v.readyState<2)return;lastT=v.currentTime;
+      f=convert(S,state,edits);drawFrame(x,f,fs,pad,f.screen);onProg(v.currentTime,v.duration);
+      const n=performance.now();if(onFrame&&n-lastPv>250){lastPv=n;onFrame(f);}
+    })();
+    await ended;
+    mr.stop();await stopped;stream.getTracks().forEach(t=>t.stop());
+    if(stop)return null;
+    const type=(mr.mimeType||mime||"video/webm").split(";")[0];
+    return {blob:new Blob(chunks,{type}),ext:type.includes("mp4")?"mp4":"webm"};
+  }finally{
+    fullJob=null;if(onVis)document.removeEventListener("visibilitychange",onVis);
+    if(mr&&mr.state!=="inactive")mr.stop();
+    v.pause();v.removeAttribute("src");v.load();if(ac)ac.close().catch(()=>{});if(c)c.width=c.height=0;
+    if(resume&&src===S0){paused=false;S0.el.play().catch(()=>{});syncPlay();}
+  }
+}
 function makePlayer(cl){
   const TH=cl.screen,frames=cl.frames.map(f=>toHTML(f)),lh=(.6/cl.aspect).toFixed(3),vw=(100/(cl.cols*.6)*.92).toFixed(3);
   return `<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASCII clip</title>\n<style>html,body{margin:0;height:100%;background:${TH.bg};color:${TH.ink}}body{display:grid;place-items:center}pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:min(${vw}vw,12px);line-height:${lh};margin:0;${shadowCSS(TH.fx)}}</style></head>\n<body><pre id="p"></pre>\n<script>const F=${JSON.stringify(frames).replace(/</g,"\\u003c")};let i=0;const p=document.getElementById("p");function t(){p.innerHTML=F[i];i=(i+1)%F.length}t();setInterval(t,${Math.round(1000/cl.fps)});<\/script>\n</body></html>\n`;
@@ -1191,6 +1249,7 @@ const DESTS=[
   {id:"svg",name:"SVG vector",desc:"Scalable vector text in your theme colors, crisp at any size. The best choice for print and posters, so screen effects are left out."},
   {id:"txt",name:"Plain text",file:"ascii.txt",desc:"The raw characters, trailing spaces trimmed.",text:f=>plainText(f)+"\n"},
   {id:"gif",g:"Animated",name:"GIF",anim:true,desc:"A seamless looping GIF. Pick an effect to animate your image, or use a clip recorded from video or camera. Single-color themes without effects use just two colors and stay small."},
+  {id:"full",name:"Full video",videoOnly:true,desc:"The whole video you loaded, converted from start to end at its own length and with its sound. MP4 where the browser supports it, otherwise WebM. It plays through once to record, so a one-minute video takes a minute. Keep this tab in front while it runs."},
   {id:"video",name:"Video file",anim:true,desc:"The same loop as a video file, MP4 where the browser supports it, otherwise WebM. Short loops repeat to at least three seconds so they play well on social."},
   {id:"player",name:"HTML player",anim:true,file:"ascii-player.html",desc:"A tiny web page that plays the loop as real text. Selectable, searchable and far smaller than a video, and it loops forever."},
   {id:"frames",name:"Frames (JSON)",anim:true,file:"ascii-frames.json",desc:"Every frame as plain text, one string per row, plus the frame rate. Feed it to your own player, a console easter egg or a library like dom-animator. Colors are left out."}
@@ -1200,11 +1259,11 @@ function openExport(id){
   if(!last){toast("Load an image first.");return;}
   expOpen=true;expId=id||expId;anim.useClip=!!clip&&(anim.useClip||id==="gif");buildList();selectDest(expId);$("#exp").hidden=false;$("#expClose").focus();
 }
-function closeExport(){expOpen=false;animTok++;$("#exp").hidden=true;clearInterval(pvTimer);if(pvUrl){URL.revokeObjectURL(pvUrl);pvUrl=null;}}
+function closeExport(){if(fullJob)fullJob.cancel();expOpen=false;animTok++;$("#exp").hidden=true;clearInterval(pvTimer);if(pvUrl){URL.revokeObjectURL(pvUrl);pvUrl=null;}}
 function buildList(){
   let h="";
-  DESTS.forEach(d=>{if(d.g)h+=`<h4>${d.g}</h4>`;h+=`<button class="dest" type="button" data-id="${d.id}">${esc(d.name)}</button>`;});
-  h+=`<p class="mnote">${clip?"Your recorded clip is ready under Animated.":"Animated exports loop any image with an effect. Record from a video or your camera to use real motion."}</p>`;
+  DESTS.forEach(d=>{if(d.videoOnly&&!isVideo())return;if(d.g)h+=`<h4>${d.g}</h4>`;h+=`<button class="dest" type="button" data-id="${d.id}">${esc(d.name)}</button>`;});
+  h+=`<p class="mnote">${clip?"Your recorded clip is ready under Animated.":isVideo()?"Full video keeps the whole length and the sound. Record a clip for GIFs and loops.":"Animated exports loop any image with an effect. Record from a video or your camera to use real motion."}</p>`;
   $("#expList").innerHTML=h;
   $$(".dest").forEach(b=>b.addEventListener("click",()=>selectDest(b.dataset.id)));
 }
@@ -1220,7 +1279,8 @@ function previewPre(f,txt,html){
   return pre;
 }
 async function selectDest(id){
-  let d=DESTS.find(x=>x.id===id);if(!d)d=DESTS[0];
+  let d=DESTS.find(x=>x.id===id);if(!d||d.videoOnly&&!isVideo())d=DESTS[0];
+  if(fullJob)fullJob.cancel();
   expId=d.id;clearInterval(pvTimer);if(pvUrl){URL.revokeObjectURL(pvUrl);pvUrl=null;}
   $$(".dest").forEach(b=>b.setAttribute("aria-current",String(b.dataset.id===d.id)));
   $("#expTitle").textContent=d.name;$("#expDesc").textContent=d.desc;$("#expActs").innerHTML="";
@@ -1244,6 +1304,27 @@ async function selectDest(id){
     if(anim.useClip&&clip)actBtn("Discard clip","",()=>{clip=null;anim.useClip=false;animCache=null;buildList();selectDest(d.id);toast("Clip discarded");});
     $("#expStats").innerHTML=stats.join("");
     return;
+  } else if(d.id==="full"){
+    // The finished file is offered on a second tap: after a long recording, phones no longer
+    // count the first tap and would block the save.
+    const pre=previewPre(f,plainText(f),toHTML(f)),dur=src.el.duration;let made=null;
+    stats.push(pill(`${f.cols} × ${f.rows}`));if(isFinite(dur))stats.push(pill(clock(dur)));
+    actBtn("Convert video","go",async b=>{
+      if(made){saveFile(made.name,made.blob,made.blob.type);return;}
+      if(fullJob)return;
+      b.disabled=true;b.textContent="Starting…";
+      const job=makeFullVideo((t,T)=>{b.textContent=`Recording ${clock(t)}${isFinite(T)?" / "+clock(T):""}`;},fr=>{pre.innerHTML=toHTML(fr);});
+      const cancel=actBtn("Cancel","",()=>{if(fullJob)fullJob.cancel();});
+      const reset=()=>{b.disabled=false;b.textContent="Convert video";cancel.remove();};
+      try{
+        const r=await job;if(!r){reset();return;}
+        made={name:`ascii-video.${r.ext}`,blob:r.blob};
+        b.disabled=false;b.textContent="Download video";cancel.remove();
+        $("#expStats").insertAdjacentHTML("beforeend",pill(`${(r.blob.size/1048576).toFixed(1)} MB`));
+        if(canShareFiles())actBtn("Save or share","",()=>shareFile(new File([made.blob],made.name,{type:made.blob.type})));
+        toast("Video ready");
+      }catch(e){reset();toast(e&&e.message==="unsupported"?"This browser can't record video.":"Converting the video failed.");}
+    });
   } else if(d.id==="png"){
     // Rendered once: the preview and both buttons use the same file, so a tap saves it right away
     // instead of re-rendering first (by then phones no longer count the tap and block the save).
@@ -1283,7 +1364,8 @@ async function selectDest(id){
   $("#expStats").innerHTML=stats.join("");
 }
 $("#expClose").addEventListener("click",closeExport);
-$("#exp").addEventListener("click",e=>{if(e.target===$("#exp"))closeExport();});
+// A stray click beside the dialog shouldn't throw away a long video conversion.
+$("#exp").addEventListener("click",e=>{if(e.target===$("#exp")&&!fullJob)closeExport();});
 $("#expBtn").addEventListener("click",()=>openExport());
 $("#animBtn").addEventListener("click",()=>openExport("gif"));
 
@@ -1333,6 +1415,28 @@ $("#zOut").addEventListener("click",()=>zoomBy(1/1.18));
 $("#zoomVal").addEventListener("click",()=>{state.fit=true;styleOut();});
 $("#cmpBtn").addEventListener("click",()=>{state.compare=!state.compare;if(state.compare)drawOverlay();styleOut();});
 new ResizeObserver(()=>{if(state.fit&&view==="studio")styleOut();}).observe(vp);
+
+/* ================= full screen ================= */
+// The Fullscreen API where there is one. iPhones only allow it for <video>, so there the
+// viewport is pinned over the page instead.
+let fsPinned=false;
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
+function syncFs(){
+  const on=fsPinned||fsEl()===vp;vp.classList.toggle("fs",on);document.body.classList.toggle("vp-fs",fsPinned);
+  $("#fsBtn").setAttribute("aria-pressed",String(on));styleOut();
+}
+function pinFs(on){fsPinned=on;syncFs();}
+function setFs(on){
+  if(on){
+    state.fit=true;const req=vp.requestFullscreen||vp.webkitRequestFullscreen;
+    if(!req){pinFs(true);return;}
+    const p=req.call(vp);if(p&&p.catch)p.catch(()=>pinFs(true));
+  } else if(fsEl()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);}
+  else pinFs(false);
+}
+document.addEventListener("fullscreenchange",syncFs);document.addEventListener("webkitfullscreenchange",syncFs);
+$("#fsBtn").addEventListener("click",()=>setFs(!vp.classList.contains("fs")));
+$("#fsExit").addEventListener("click",()=>setFs(false));
 let rsT=0;window.addEventListener("resize",()=>{clearTimeout(rsT);rsT=setTimeout(()=>{if(view==="home")renderSamples();},150);});
 
 const kb=$("#kb");
@@ -1345,6 +1449,7 @@ window.addEventListener("keydown",e=>{
   if(view!=="studio")return;
   const t=e.target;if(t.matches&&t.matches("input[type=text],textarea"))return;
   const mod=e.ctrlKey||e.metaKey,k=e.key;
+  if(k==="Escape"&&vp.classList.contains("fs")){setFs(false);e.preventDefault();return;}
   if(state.tool==="type"&&cursor&&!mod&&!e.altKey){
     if(k.length===1||Array.from(k).length===1){setEdit(cursor.r,cursor.c,k);cursor.c=Math.min(last.cols-1,cursor.c+1);showCursor();e.preventDefault();return;}
     const mv={ArrowLeft:[0,-1],ArrowRight:[0,1],ArrowUp:[-1,0],ArrowDown:[1,0]}[k];
@@ -1360,7 +1465,7 @@ window.addEventListener("keydown",e=>{
   if(k.length===1&&"123456".includes(k))setK("mode",modes[+k-1]);
   else if(lk==="i")setK("invert",!state.invert);
   else if(lk==="c"){state.compare=!state.compare;if(state.compare)drawOverlay();styleOut();}
-  else if(lk==="f"){state.fit=true;styleOut();}
+  else if(lk==="f"){if(e.shiftKey)setFs(!vp.classList.contains("fs"));else{state.fit=true;styleOut();}}
   else if(lk==="b")setK("tool",state.tool==="brush"?"none":"brush");
   else if(lk==="e")setK("tool",state.tool==="erase"?"none":"erase");
   else if(lk==="t")setK("tool",state.tool==="type"?"none":"type");
