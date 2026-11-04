@@ -59,6 +59,8 @@ const fmt={
   sharpen:v=>Math.round(v)+"%",threshold:v=>Math.round(v*100)+"%",edgeThresh:v=>Math.round(v*100)+"%",textCut:v=>Math.round(v*100)+"%",
   cols:v=>`${v}<small>chars</small>`,aspect:v=>(+v).toFixed(2)
 };
+// Knobs stored as 0–1 but shown as percentages, so a typed "40" means 0.4.
+const KSCALE={threshold:100,edgeThresh:100,textCut:100};
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const rgbHex=c=>"#"+c.map(v=>v.toString(16).padStart(2,"0")).join("");
 const mix=(a,b,t)=>[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*t));
@@ -601,17 +603,28 @@ function arcPath(a0,a1,r){
 function makeKnob(host){
   const k=host.dataset.k,min=+host.dataset.min,max=+host.dataset.max,step=+host.dataset.step,def=+host.dataset.def,label=host.dataset.label;
   const center=host.dataset.center!==undefined?+host.dataset.center:min;
-  host.innerHTML=`<div class="kn" role="slider" tabindex="0" aria-label="${label}" aria-valuemin="${min}" aria-valuemax="${max}"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="trk" d="${arcPath(-135,135,28)}"/><path class="val"/><circle class="cap" cx="32" cy="32" r="19"/><circle class="capr" cx="32" cy="32" r="18.5"/><line class="ptr"/></svg></div><span class="kval"></span><span class="klabel">${label}</span>`;
-  const kn=host.querySelector(".kn"),val=host.querySelector(".val"),ptr=host.querySelector(".ptr"),ov=host.querySelector(".kval");
+  host.innerHTML=`<div class="kn" role="slider" tabindex="0" aria-label="${label}" aria-valuemin="${min}" aria-valuemax="${max}"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="trk" d="${arcPath(-135,135,28)}"/><path class="val"/><circle class="cap" cx="32" cy="32" r="19"/><circle class="capr" cx="32" cy="32" r="18.5"/><line class="ptr"/></svg></div><input class="kval" type="text"${min<0?"":' inputmode="decimal"'} autocomplete="off" spellcheck="false" aria-label="${label} value"><span class="klabel">${label}</span>`;
+  const kn=host.querySelector(".kn"),val=host.querySelector(".val"),ptr=host.querySelector(".ptr"),ov=host.querySelector(".kval"),scale=KSCALE[k]||1;
   const ang=v=>-135+(v-min)/(max-min)*270;
   function draw(){
     const v=state[k],a=ang(v),a0=ang(center);
     val.setAttribute("d",arcPath(Math.min(a0,a),Math.max(a0,a),28));
     const [x1,y1]=polar(a,7),[x2,y2]=polar(a,15.5);
     ptr.setAttribute("x1",x1);ptr.setAttribute("y1",y1);ptr.setAttribute("x2",x2);ptr.setAttribute("y2",y2);
-    ov.textContent=fmt[k](v);kn.setAttribute("aria-valuenow",v);kn.setAttribute("aria-valuetext",fmt[k](v));
+    if(ov!==document.activeElement)ov.value=fmt[k](v);kn.setAttribute("aria-valuenow",v);kn.setAttribute("aria-valuetext",fmt[k](v));
   }
-  function set(v){v=Math.round(v/step)*step;v=+Math.min(max,Math.max(min,v)).toFixed(4);if(v===state[k])return;state[k]=v;draw();changed(k);}
+  function set(v,exact){if(!exact)v=Math.round(v/step)*step;v=+Math.min(max,Math.max(min,v)).toFixed(4);if(v===state[k])return;state[k]=v;draw();changed(k);}
+  // The value under the knob is a text field: typed numbers skip the knob's step, so 1.23 stays 1.23.
+  const typed=()=>{const n=parseFloat(ov.value.replace(",",".").replace(/[^0-9.+-]/g,""));if(isFinite(n))set(n/scale,true);ov.value=fmt[k](state[k]);};
+  ov.addEventListener("focus",()=>ov.select());
+  // Kept from the host: it carries data-k too, and the generic data-k handler would read its missing value.
+  ov.addEventListener("input",e=>e.stopPropagation());
+  ov.addEventListener("change",typed);
+  ov.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){typed();ov.blur();e.preventDefault();}
+    else if(e.key==="Escape"){ov.value=fmt[k](state[k]);ov.blur();e.preventDefault();}
+    e.stopPropagation();
+  });
   let drag=false,sy=0,sv=0;
   kn.addEventListener("pointerdown",e=>{drag=true;sy=e.clientY;sv=state[k];kn.setPointerCapture(e.pointerId);kn.classList.add("on");kn.focus();e.preventDefault();});
   kn.addEventListener("pointermove",e=>{if(!drag)return;set(sv+(sy-e.clientY)/(e.shiftKey?700:170)*(max-min));});
@@ -1045,6 +1058,10 @@ function makePlayer(cl){
   const TH=cl.screen,frames=cl.frames.map(f=>toHTML(f)),lh=(.6/cl.aspect).toFixed(3),vw=(100/(cl.cols*.6)*.92).toFixed(3);
   return `<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASCII clip</title>\n<style>html,body{margin:0;height:100%;background:${TH.bg};color:${TH.ink}}body{display:grid;place-items:center}pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:min(${vw}vw,12px);line-height:${lh};margin:0;${shadowCSS(TH.fx)}}</style></head>\n<body><pre id="p"></pre>\n<script>const F=${JSON.stringify(frames).replace(/</g,"\\u003c")};let i=0;const p=document.getElementById("p");function t(){p.innerHTML=F[i];i=(i+1)%F.length}t();setInterval(t,${Math.round(1000/cl.fps)});<\/script>\n</body></html>\n`;
 }
+// Each frame is an array of rows padded to the full width, so frames line up when swapped.
+function makeFrames(cl){
+  return JSON.stringify({fps:cl.fps,cols:cl.cols,rows:cl.rows,frames:cl.frames.map(f=>f.cells.map(l=>l.join("")))},null,2)+"\n";
+}
 function ansi(f){
   if(!f.colors)return plainText(f)+"\n";
   const E="\x1b[";
@@ -1175,7 +1192,8 @@ const DESTS=[
   {id:"txt",name:"Plain text",file:"ascii.txt",desc:"The raw characters, trailing spaces trimmed.",text:f=>plainText(f)+"\n"},
   {id:"gif",g:"Animated",name:"GIF",anim:true,desc:"A seamless looping GIF. Pick an effect to animate your image, or use a clip recorded from video or camera. Single-color themes without effects use just two colors and stay small."},
   {id:"video",name:"Video file",anim:true,desc:"The same loop as a video file, MP4 where the browser supports it, otherwise WebM. Short loops repeat to at least three seconds so they play well on social."},
-  {id:"player",name:"HTML player",anim:true,file:"ascii-player.html",desc:"A tiny web page that plays the loop as real text. Selectable, searchable and far smaller than a video, and it loops forever."}
+  {id:"player",name:"HTML player",anim:true,file:"ascii-player.html",desc:"A tiny web page that plays the loop as real text. Selectable, searchable and far smaller than a video, and it loops forever."},
+  {id:"frames",name:"Frames (JSON)",anim:true,file:"ascii-frames.json",desc:"Every frame as plain text, one string per row, plus the frame rate. Feed it to your own player, a console easter egg or a library like dom-animator. Colors are left out."}
 ];
 let expOpen=false,expId="github",pvTimer=0,pvUrl=null;
 function openExport(id){
@@ -1221,6 +1239,8 @@ async function selectDest(id){
     if(d.id==="gif")actBtn("Download GIF","go",b=>enc(b,"Download GIF",async pr=>{const blob=await makeGIF(A,pr);await saveFile("ascii.gif",blob,"image/gif");}));
     if(d.id==="video")actBtn("Make video","go",b=>enc(b,"Make video",async pr=>{const r=await makeVideo(A,pr);await saveFile(`ascii.${r.ext}`,r.blob,r.blob.type);}));
     if(d.id==="player")actBtn("Download HTML","go",()=>saveFile(d.file,makePlayer(A),"text/html"));
+    if(d.id==="frames"){const json=makeFrames(A);stats.push(pill(`${Math.round(json.length/1024)} KB`));
+      actBtn("Download JSON","go",()=>saveFile(d.file,json,"application/json"));actBtn("Copy","",()=>copyText(json,"Frames copied to clipboard"));}
     if(anim.useClip&&clip)actBtn("Discard clip","",()=>{clip=null;anim.useClip=false;animCache=null;buildList();selectDest(d.id);toast("Clip discarded");});
     $("#expStats").innerHTML=stats.join("");
     return;

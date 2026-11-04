@@ -45,6 +45,7 @@ Everything runs in your browser, and your images never leave your device.
 | Web embed       | One self-contained `<pre>` tag                   |
 | PNG / SVG       | Sharp raster images or vectors for poster sizes  |
 | GIF / MP4       | Seamless loops and videos ready for social media |
+| Frames (JSON)   | Every frame as text rows, for your own player    |
 
 ## Privacy
 
